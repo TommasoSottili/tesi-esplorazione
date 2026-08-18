@@ -8,7 +8,7 @@ class Environment:
   def __init__(self, xmin, ymin, xmax, ymax):
 
     self.obstacles = [] # lista degli ostacoi del bosco
-    self.bounds = box(xmin, ymin, xmax, ymax) # confini rettangolari dell' area 
+    self.bounds = box(xmin, ymin, xmax, ymax) # confini rettangolari dell'area 
     self._union_cache = None
     self._union_dirty = True
 
@@ -45,5 +45,15 @@ class Environment:
     punto_piu_vicino = nearest_points(origine, intersezione)[1]
     return (punto_piu_vicino.x, punto_piu_vicino.y)
 
+  def plot(self, ax):
     
-     
+    x_bordi, y_bordi = self.bounds.exterior.xy # Disegno il rettangolo dei confini
+    ax.plot(x_bordi, y_bordi, color='black', linewidth=1.5)
+
+    for ostacolo in self.obstacles: # Disegno ogni ostacolo come una sagoma piena
+        x_ost, y_ost = ostacolo.exterior.xy
+        ax.fill(x_ost, y_ost, facecolor='forestgreen', edgecolor='darkgreen')
+
+    ax.set_aspect('equal') # Impongo che gli assi abbiano la stessa scala
+
+  
