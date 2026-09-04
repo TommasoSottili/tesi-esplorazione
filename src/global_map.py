@@ -101,4 +101,34 @@ class GlobalMap:
 
                     # gonfio SOLO le celle libere (non tocco occupate, sconosciute, già inflated)
                     if self.grid[r][c] == FREE:
-                        self.grid[r][c] = INFLATED       
+                        self.grid[r][c] = INFLATED     
+
+    def find_frontiers(self):
+       
+        frontiers = []
+
+        # le 4 direzioni per guardare i vicini
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+        # scorro tutte le celle della griglia
+        for row in range(self.n_rows):
+            for col in range(self.n_cols):
+
+                # una frontiera deve essere una cella LIBERA
+                if self.grid[row][col] != FREE:
+                    continue
+
+                # controllo se ha almeno un vicino SCONOSCIUTO
+                for dr, dc in directions:
+                    r = row + dr
+                    c = col + dc
+
+                    # salto i vicini fuori dai confini
+                    if r < 0 or r >= self.n_rows or c < 0 or c >= self.n_cols:
+                        continue
+
+                    if self.grid[r][c] == UNKNOWN:
+                        frontiers.append((row, col))
+                        break   # basta un vicino sconosciuto: è frontiera, passo oltre
+
+        return frontiers  
