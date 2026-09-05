@@ -23,8 +23,10 @@ class GlobalMap:
         self.grid = np.full((self.n_rows, self.n_cols), UNKNOWN, dtype=int)
 
     def world_to_cell(self, wx, wy):
-        col = int(wx / self.resolution)
-        row = int(wy / self.resolution)
+        # (+1e-9 evita che un punto esattamente sul bordo tra due celle finisca
+        # nella cella sbagliata per rumore di virgola mobile, es. 40.999999999 -> 40 invece di 41)
+        col = int(wx / self.resolution + 1e-9)
+        row = int(wy / self.resolution + 1e-9)
 
         if row < 0 or row >= self.n_rows or col < 0 or col >= self.n_cols:
             return None
@@ -75,8 +77,8 @@ class GlobalMap:
                   extent=[0, self.world_width, 0, self.world_height])
         ax.set_title("Mappa globale (grigio=ignoto, bianco=libero, nero=occupato, rosso=sicurezza)")
     
-    def inflate_obstacles(self, inflation_radius=0.4):
-        
+    def inflate_obstacles(self, inflation_radius=0.4, robot_cell=None):
+
         # raggio di inflation espresso in numero di celle
         radius_cells = int(inflation_radius / self.resolution)
 
@@ -99,9 +101,14 @@ class GlobalMap:
                     if dr * dr + dc * dc > radius_cells * radius_cells:
                         continue
 
+                    # non gonfio mai la cella dove si trova il robot: ci è già sopra,
+                    # marcarla vietata dopo il fatto lo intrappolerebbe sul posto
+                    if robot_cell is not None and (r, c) == tuple(robot_cell):
+                        continue
+
                     # gonfio SOLO le celle libere (non tocco occupate, sconosciute, già inflated)
                     if self.grid[r][c] == FREE:
-                        self.grid[r][c] = INFLATED     
+                        self.grid[r][c] = INFLATED
 
     def find_frontiers(self):
        

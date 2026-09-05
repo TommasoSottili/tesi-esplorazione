@@ -9,7 +9,7 @@ from pathfinding import find_path
 
 # 1. Bosco, sensore, mappa globale
 forest = generate_forest(20, 20, n_trees=15, n_rocks=3, seed=42)
-sensor = Lidar(n_rays=360, r_max=6.0)
+sensor = Lidar(n_rays=360, r_max=4.0)
 global_map = GlobalMap(world_width=20, world_height=20, resolution=0.2)
 
 # 2. Scansiono da una griglia di posizioni per creare un'ampia zona nota e connessa
@@ -17,8 +17,8 @@ for x in range(3, 18, 2):
     for y in range(3, 18, 2):
         robot_state = (float(x), float(y), 0.0)
         points = np.array(sensor.scan(robot_state, forest))
-        local = build_local_grid(robot_state, points, window_size=4.0, resolution=0.2, r_max=6.0)
-        global_map.update(local, robot_state, window_size=4.0)
+        local = build_local_grid(robot_state, points, window_size=8.0, resolution=0.2, r_max=4.0)
+        global_map.update(local, robot_state, window_size=8.0)
 
 # 3. Gonfio gli ostacoli (il percorso dovrà evitare anche le zone rosse)
 global_map.inflate_obstacles(inflation_radius=0.4)

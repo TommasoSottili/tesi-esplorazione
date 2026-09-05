@@ -8,7 +8,7 @@ from global_map import GlobalMap
 
 # 1. Bosco, sensore, mappa
 forest = generate_forest(20, 20, n_trees=15, n_rocks=3, seed=42)
-sensor = Lidar(n_rays=360, r_max=6.0)
+sensor = Lidar(n_rays=360, r_max=4.0)
 global_map = GlobalMap(world_width=20, world_height=20, resolution=0.2)
 
 # 2. Esploro POCO (poche posizioni), così resta molto ignoto e le frontiere si vedono
@@ -18,8 +18,8 @@ positions = [
 ]
 for robot_state in positions:
     points = np.array(sensor.scan(robot_state, forest))
-    local = build_local_grid(robot_state, points, window_size=4.0, resolution=0.2, r_max=6.0)
-    global_map.update(local, robot_state, window_size=4.0)
+    local = build_local_grid(robot_state, points, window_size=8.0, resolution=0.2, r_max=4.0)
+    global_map.update(local, robot_state, window_size=8.0)
 
 global_map.inflate_obstacles(inflation_radius=0.4)
 

@@ -6,7 +6,7 @@ import numpy as np
 from shapely.geometry import LineString
 
 class Lidar:
-    def __init__(self, n_rays=360, angle_span=2*np.pi, r_max=6.0, angle_offset=0.0, add_noise=False, noise_std=0.01):
+    def __init__(self, n_rays=360, angle_span=2*np.pi, r_max=4.0, angle_offset=0.0, add_noise=False, noise_std=0.01):
         """
         :param n_rays: numero di raggi per scansione
         :param angle_span: ampiezza angolare totale(rad)
