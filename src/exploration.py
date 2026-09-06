@@ -2,7 +2,7 @@
 import numpy as np
 from global_map import GlobalMap, FREE
 from local_grid import build_local_grid
-from pathfinding import find_path
+from pathfinding import find_path, reachable_cells
 
 
 def run_exploration(forest, sensor, start_position, strategy,
@@ -47,6 +47,21 @@ def run_exploration(forest, sensor, start_position, strategy,
         frontiers = global_map.find_frontiers()
         if not frontiers:
             break   # niente più da esplorare: esplorazione completata
+
+        # scarto le frontiere non raggiungibili dal robot (es. isolate dalla
+        # fascia di sicurezza attorno agli ostacoli): sceglierle sprecherebbe
+        # passi in pathfinding destinati a fallire. Scarto anche la cella del
+        # robot stessa: può ricomparire come frontiera se uno dei suoi vicini
+        # resta sconosciuto, ma sceglierla come target non produce un vero
+        # movimento (find_path restituirebbe un percorso di un solo passo).
+        # Fatto qui, prima di interpellare la strategia, cosi' ogni strategia
+        # (casuale, serpentina, frontier-based, ...) riceve solo candidati
+        # validi senza doverlo reimplementare ciascuna per conto proprio.
+        reachable = reachable_cells(global_map, robot_cell)
+        frontiers = [f for f in frontiers if f in reachable and f != robot_cell]
+        if not frontiers:
+            break   # nessuna frontiera nota è raggiungibile: mi fermo per sicurezza
+
                 # --- 4. DECISIONE: la strategia sceglie dove andare ---
         target_cell = strategy(global_map, frontiers, robot_cell)
 

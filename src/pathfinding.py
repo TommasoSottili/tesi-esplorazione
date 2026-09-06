@@ -25,6 +25,26 @@ def get_walkable_neighbors(cell, global_map):
 
     return neighbors
 
+def reachable_cells(global_map, start):
+    # BFS sulle celle percorribili (FREE) raggiungibili da start, 4-connesse.
+    # Utility condivisa: qualunque strategia/orchestratore può usarla per
+    # sapere quali celle sono davvero raggiungibili dal robot, senza
+    # duplicare la logica di percorribilità già definita sopra.
+    if start is None:
+        return set()
+
+    visited = {start}
+    stack = [start]
+
+    while stack:
+        current = stack.pop()
+        for neighbor in get_walkable_neighbors(current, global_map):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                stack.append(neighbor)
+
+    return visited
+
 def find_path(global_map, start, goal):
     
     # 1. Strutture dati di Dijkstra
