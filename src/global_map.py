@@ -6,7 +6,7 @@ from matplotlib.colors import ListedColormap
 UNKNOWN = 0
 FREE = 1
 OCCUPIED = 2
-INFLATED = 3   # cella libera ma troppo vicina a un ostacolo: vietata alla navigazione
+INFLATED = 3   
 
 class GlobalMap:
     def __init__(self, world_width, world_height, resolution=0.2):
@@ -23,8 +23,7 @@ class GlobalMap:
         self.grid = np.full((self.n_rows, self.n_cols), UNKNOWN, dtype=int)
 
     def world_to_cell(self, wx, wy):
-        # (+1e-9 evita che un punto esattamente sul bordo tra due celle finisca
-        # nella cella sbagliata per rumore di virgola mobile, es. 40.999999999 -> 40 invece di 41)
+    
         col = int(wx / self.resolution + 1e-9)
         row = int(wy / self.resolution + 1e-9)
 
@@ -33,10 +32,16 @@ class GlobalMap:
         return (row, col)
 
     def update(self, local_grid, robot_state, window_size=4.0):
-        
+
         robot_x, robot_y, _ = robot_state
-        half = window_size / 2.0
-        n_local = local_grid.shape[0]   # celle per lato della griglia locale 
+        n_local = local_grid.shape[0]   # celle per lato della griglia locale
+
+        robot_cell = self.world_to_cell(robot_x, robot_y)
+        if robot_cell is None:
+            return  
+
+        robot_row, robot_col = robot_cell
+        half_cells = n_local // 2  
 
         # scorro tutte le celle della griglia locale
         for local_row in range(n_local):
@@ -47,25 +52,18 @@ class GlobalMap:
                 if state == UNKNOWN:
                     continue
 
-                # converto la cella locale in coordinate del mondo
-                wx = robot_x - half + (local_col + 0.5) * self.resolution
-                wy = robot_y - half + (local_row + 0.5) * self.resolution
+                global_row = robot_row - half_cells + local_row
+                global_col = robot_col - half_cells + local_col
 
-                # trovo la cella globale corrispondente
-                cell = self.world_to_cell(wx, wy)
-                if cell is None:
-                    continue   # fuori dai confini del mondo, salto
+                if global_row < 0 or global_row >= self.n_rows or global_col < 0 or global_col >= self.n_cols:
+                    continue
 
-                global_row, global_col = cell
                 current = self.grid[global_row][global_col]
 
                 if current == UNKNOWN:
-                    # non sapevo nulla, prendo quello che dice la locale
                     self.grid[global_row][global_col] = state
                 elif state == OCCUPIED:
-                    # l'occupato ha priorità, lo scrivo sempre
                     self.grid[global_row][global_col] = OCCUPIED
-                # altrimenti lascio com'è
     
     def plot(self, ax):
         from matplotlib.colors import ListedColormap
@@ -77,7 +75,7 @@ class GlobalMap:
                   extent=[0, self.world_width, 0, self.world_height])
         ax.set_title("Mappa globale (grigio=ignoto, bianco=libero, nero=occupato, rosso=sicurezza)")
     
-    def inflate_obstacles(self, inflation_radius=0.4, robot_cell=None):
+    def inflate_obstacles(self, inflation_radius=0.2, robot_cell=None):
 
         # raggio di inflation espresso in numero di celle
         radius_cells = int(inflation_radius / self.resolution)
@@ -85,7 +83,6 @@ class GlobalMap:
         # trovo le coordinate (riga, colonna) di tutte le celle occupate
         occupied_cells = np.argwhere(self.grid == OCCUPIED)
 
-        # per ogni cella occupata, gonfio attorno
         for (row, col) in occupied_cells:
             # scorro il quadrato di celle attorno a quella occupata
             for dr in range(-radius_cells, radius_cells + 1):
@@ -97,16 +94,13 @@ class GlobalMap:
                     if r < 0 or r >= self.n_rows or c < 0 or c >= self.n_cols:
                         continue
 
-                    # controllo che la cella sia davvero entro il raggio (cerchio, non quadrato)
+                    # controllo che la cella sia davvero entro il raggio 
                     if dr * dr + dc * dc > radius_cells * radius_cells:
                         continue
 
-                    # non gonfio mai la cella dove si trova il robot: ci è già sopra,
-                    # marcarla vietata dopo il fatto lo intrappolerebbe sul posto
                     if robot_cell is not None and (r, c) == tuple(robot_cell):
                         continue
 
-                    # gonfio SOLO le celle libere (non tocco occupate, sconosciute, già inflated)
                     if self.grid[r][c] == FREE:
                         self.grid[r][c] = INFLATED
 
@@ -121,11 +115,9 @@ class GlobalMap:
         for row in range(self.n_rows):
             for col in range(self.n_cols):
 
-                # una frontiera deve essere una cella LIBERA
                 if self.grid[row][col] != FREE:
                     continue
 
-                # controllo se ha almeno un vicino SCONOSCIUTO
                 for dr, dc in directions:
                     r = row + dr
                     c = col + dc
@@ -136,6 +128,6 @@ class GlobalMap:
 
                     if self.grid[r][c] == UNKNOWN:
                         frontiers.append((row, col))
-                        break   # basta un vicino sconosciuto: è frontiera, passo oltre
+                        break  
 
         return frontiers  

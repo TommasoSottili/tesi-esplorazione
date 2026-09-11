@@ -1,5 +1,6 @@
 
 import heapq
+from collections import deque
 from global_map import FREE
 
 
@@ -8,7 +9,6 @@ def get_walkable_neighbors(cell, global_map):
     row, col = cell
     neighbors = []
 
-    # le 4 direzioni: su, giù, sinistra, destra
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
     for dr, dc in directions:
@@ -25,42 +25,43 @@ def get_walkable_neighbors(cell, global_map):
 
     return neighbors
 
+def reachable_cells_with_distance(global_map, start):
+    
+    if start is None:
+        return {}
+
+    distances = {start: 0}
+    queue = deque([start])
+
+    while queue:
+        current = queue.popleft()
+        for neighbor in get_walkable_neighbors(current, global_map):
+            if neighbor not in distances:
+                distances[neighbor] = distances[current] + 1
+                queue.append(neighbor)
+
+    return distances
+
 def reachable_cells(global_map, start):
-    # BFS sulle celle percorribili (FREE) raggiungibili da start, 4-connesse.
-    # Utility condivisa: qualunque strategia/orchestratore può usarla per
+    # qualunque strategia può usarla per
     # sapere quali celle sono davvero raggiungibili dal robot, senza
     # duplicare la logica di percorribilità già definita sopra.
-    if start is None:
-        return set()
-
-    visited = {start}
-    stack = [start]
-
-    while stack:
-        current = stack.pop()
-        for neighbor in get_walkable_neighbors(current, global_map):
-            if neighbor not in visited:
-                visited.add(neighbor)
-                stack.append(neighbor)
-
-    return visited
+    return reachable_cells_with_distance(global_map, start).keys()
 
 def find_path(global_map, start, goal):
     
-    # 1. Strutture dati di Dijkstra
-    distances = {start: 0}          # distanza minima nota da start a ogni cella
-    predecessors = {}               # da quale cella siamo arrivati a una data cella
-    visited = set()                 # celle già definitivamente processate
+    distances = {start: 0}        
+    predecessors = {}             
+    visited = set()                
 
     # 2. La coda di priorità: contiene coppie (distanza, cella)
     priority_queue = [(0, start)]
 
-    # 3. Ciclo principale: espansione a onde
+    # 3. espansione a onde
     while priority_queue:
         # estraggo la cella con distanza minore tra quelle in attesa
         current_dist, current = heapq.heappop(priority_queue)
 
-        # se l'ho già processata, la salto (può capitare di averla in coda più volte)
         if current in visited:
             continue
         visited.add(current)
@@ -71,7 +72,7 @@ def find_path(global_map, start, goal):
 
         # esamino i vicini percorribili
         for neighbor in get_walkable_neighbors(current, global_map):
-            new_dist = current_dist + 1   # ogni passo costa 1 (celle adiacenti)
+            new_dist = current_dist + 1  
 
             # se ho trovato un percorso più corto verso questo vicino, lo aggiorno
             if neighbor not in distances or new_dist < distances[neighbor]:
@@ -79,7 +80,6 @@ def find_path(global_map, start, goal):
                 predecessors[neighbor] = current
                 heapq.heappush(priority_queue, (new_dist, neighbor))
 
-    # 4. Se svuoto la coda senza raggiungere goal, non esiste percorso
     return None
 
 def reconstruct_path(predecessors, start, goal):
@@ -87,11 +87,9 @@ def reconstruct_path(predecessors, start, goal):
     path = [goal]
     current = goal
 
-    # risalgo di predecessore in predecessore, da goal fino a start
     while current != start:
         current = predecessors[current]
         path.append(current)
 
-    # il percorso è stato costruito al contrario (da goal a start): lo giro
     path.reverse()
     return path
