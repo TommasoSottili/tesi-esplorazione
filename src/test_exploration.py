@@ -6,13 +6,14 @@ from lidar import Lidar
 from exploration import run_exploration
 from strategies import random_strategy
 from strategies import frontier_strategy
+from strategies import serpentine_strategy
 
-forest = generate_forest(20, 20, n_trees=15, n_rocks=3, seed=42)
+forest = generate_forest(20, 20, n_trees=15, n_rocks=3, seed=123)
 sensor = Lidar(n_rays=360, r_max=4.0)
 start_position = (10.0, 10.0, 0.0)   # stesso centro protetto dalla clearance
 
 global_map, point_cloud, stats = run_exploration(
-    forest, sensor, start_position, frontier_strategy,
+    forest, sensor, start_position, serpentine_strategy,
     world_width=20.0, world_height=20.0, resolution=0.2,
     window_size=8.0, inflation_radius=0.2, max_steps=300
 )
