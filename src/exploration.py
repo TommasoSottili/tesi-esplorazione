@@ -9,7 +9,7 @@ from strategies import compute_serpentine_rank
 def run_exploration(forest, sensor, start_position, strategy,
                      world_width=20.0, world_height=20.0, resolution=0.2,
                      window_size=8.0, inflation_radius=0.2, max_steps=300,
-                     macro_cell_size=1.0):
+                     macro_cell_size=1.0, corona_margin=0.6):
     
     robot_state = start_position
     global_map = GlobalMap(world_width, world_height, resolution)
@@ -41,7 +41,8 @@ def run_exploration(forest, sensor, start_position, strategy,
                 point_cloud_parts.append(hits)
 
             robot_cell = global_map.world_to_cell(robot_x, robot_y)
-            local = build_local_grid(robot_state, scan_points, window_size, resolution, sensor.r_max)
+            local = build_local_grid(robot_state, scan_points, window_size, resolution, sensor.r_max,
+                                      corona_margin=corona_margin)
             global_map.update(local, robot_state, window_size)
 
             

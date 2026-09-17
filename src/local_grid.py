@@ -24,13 +24,16 @@ def world_to_cell(wx, wy, robot_x, robot_y, window_size, resolution):
 
     return (row, col)
 
-def build_local_grid(robot_state, scan_points, window_size=4.0, resolution=0.2, r_max=2.0, free_margin=None):
+def build_local_grid(robot_state, scan_points, window_size=4.0, resolution=0.2, r_max=2.0, free_margin=None, corona_margin=None):
 
     robot_x, robot_y, _ = robot_state
 
-    
+
     if free_margin is None:
         free_margin = resolution
+
+    if corona_margin is None:
+        corona_margin = resolution
 
     # Creo la griglia, inizialmente tutta sconosciuta
     n_cells = int(window_size / resolution)
@@ -47,8 +50,8 @@ def build_local_grid(robot_state, scan_points, window_size=4.0, resolution=0.2, 
 
         is_hit = distance < r_max - 1e-6
 
-       
-        free_distance = max(distance - free_margin, 0.0) if is_hit else distance
+
+        free_distance = max(distance - free_margin, 0.0) if is_hit else max(distance - corona_margin, 0.0)
 
         dir_x = (px - robot_x) / distance
         dir_y = (py - robot_y) / distance
