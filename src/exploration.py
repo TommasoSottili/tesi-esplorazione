@@ -16,8 +16,9 @@ def run_exploration(forest, sensor, start_position, strategy,
     point_cloud_parts = []
     total_distance = 0.0
     steps = 0                 
-    coverage_history = []      
-    trajectory = []             
+    coverage_history = []
+    trajectory = []
+    grid_history = []
     stuck_frontiers = set()   
     pending_check = None       
 
@@ -37,8 +38,7 @@ def run_exploration(forest, sensor, start_position, strategy,
 
             dists = np.hypot(scan_points[:, 0] - robot_x, scan_points[:, 1] - robot_y)
             hits = scan_points[dists < sensor.r_max - 1e-6]
-            if len(hits) > 0:
-                point_cloud_parts.append(hits)
+            point_cloud_parts.append(hits)
 
             robot_cell = global_map.world_to_cell(robot_x, robot_y)
             local = build_local_grid(robot_state, scan_points, window_size, resolution, sensor.r_max,
@@ -52,6 +52,7 @@ def run_exploration(forest, sensor, start_position, strategy,
             global_map.inflate_obstacles(inflation_radius, robot_cell=robot_cell)
             coverage_history.append(int(np.sum(global_map.grid != 0)))
             trajectory.append(robot_cell)
+            grid_history.append(global_map.grid.copy())
             scan_needed = False
 
         if path is None:
@@ -114,5 +115,7 @@ def run_exploration(forest, sensor, start_position, strategy,
         "cells_known": int(np.sum(global_map.grid != 0)),
         "coverage_history": coverage_history,
         "trajectory": trajectory,
+        "grid_history": grid_history,
+        "point_cloud_history": point_cloud_parts,
     }
     return global_map, point_cloud, stats

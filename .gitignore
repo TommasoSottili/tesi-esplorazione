@@ -8,3 +8,6 @@ __pycache__/
 # Impostazioni editor e file di sistema
 .vscode/
 .DS_Store
+
+# Output generati (frame e gif dei film di esplorazione)
+output/
