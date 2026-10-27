@@ -9,9 +9,10 @@ from exploration import run_exploration
 from strategies import random_strategy, frontier_strategy, serpentine_strategy
 from render import render_frame
 
-SEED = 1
+SEED = 24
 STRATEGY_NAME = "serpentine"   # "random" | "frontier" | "serpentine"
-CORONA_MARGIN = 0.0           
+CORONA_MARGIN = 0.6
+MACRO_CELL_SIZE = 4.0          # lato delle macro-celle (m), conta solo per la serpentina
 
 STRATEGIES = {
     "random": random_strategy,
@@ -23,7 +24,10 @@ WORLD_WIDTH = 20.0
 WORLD_HEIGHT = 20.0
 RESOLUTION = 0.2
 
-OUTPUT_DIR = os.path.join("..", "output", f"film_{STRATEGY_NAME}_seed{SEED}_corona{CORONA_MARGIN}")
+film_name = f"film_{STRATEGY_NAME}_seed{SEED}_corona{CORONA_MARGIN}"
+if STRATEGY_NAME == "serpentine":
+    film_name += f"_macro{MACRO_CELL_SIZE:g}"
+OUTPUT_DIR = os.path.join("..", "output", film_name)
 
 
 forest = generate_forest(20, 20, n_trees=15, n_rocks=3, seed=SEED)
@@ -34,7 +38,7 @@ global_map, point_cloud, stats = run_exploration(
     forest, sensor, (10.0, 10.0, 0.0), strategy,
     world_width=WORLD_WIDTH, world_height=WORLD_HEIGHT, resolution=RESOLUTION,
     window_size=8.0, inflation_radius=0.2, max_steps=300,
-    corona_margin=CORONA_MARGIN
+    corona_margin=CORONA_MARGIN, macro_cell_size=MACRO_CELL_SIZE
 )
 
 trajectory = stats["trajectory"]
