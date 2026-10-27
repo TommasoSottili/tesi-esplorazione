@@ -1,0 +1,4 @@
+strategy,n_runs,coverage_mean,coverage_median,distance_mean_m,time_mean_ms
+random,50,96.19,96.27,362.9,162461
+frontier,50,88.3,96.07,128.6,58301
+serpentine,50,91.63,96.21,179.0,78709
