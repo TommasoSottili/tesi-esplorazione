@@ -3,6 +3,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
+from shapely.geometry import Point
 from forest_generator import generate_forest
 from lidar import Lidar
 from exploration import run_exploration
@@ -13,6 +14,13 @@ SEED = 24
 STRATEGY_NAME = "serpentine"   # "random" | "frontier" | "serpentine"
 CORONA_MARGIN = 0.6
 MACRO_CELL_SIZE = 4.0          # lato delle macro-celle (m), conta solo per la serpentina
+START = "center"               # "center" | "corner"
+
+START_POSITIONS = {
+    "center": (10.0, 10.0, 0.0),
+    "corner": (0.1, 0.1, 0.0),   # centro della cella nell'angolo in basso a sinistra
+}
+START_POSITION = START_POSITIONS[START]
 
 STRATEGIES = {
     "random": random_strategy,
@@ -27,15 +35,18 @@ RESOLUTION = 0.2
 film_name = f"film_{STRATEGY_NAME}_seed{SEED}_corona{CORONA_MARGIN}"
 if STRATEGY_NAME == "serpentine":
     film_name += f"_macro{MACRO_CELL_SIZE:g}"
+if START != "center":
+    film_name += f"_{START}"
 OUTPUT_DIR = os.path.join("..", "output", film_name)
 
 
-forest = generate_forest(20, 20, n_trees=15, n_rocks=3, seed=SEED)
+forest = generate_forest(20, 20, n_trees=15, n_rocks=3, seed=SEED,
+                         start_point=Point(START_POSITION[0], START_POSITION[1]))
 sensor = Lidar(n_rays=360, r_max=4.0)
 strategy = STRATEGIES[STRATEGY_NAME]
 
 global_map, point_cloud, stats = run_exploration(
-    forest, sensor, (10.0, 10.0, 0.0), strategy,
+    forest, sensor, START_POSITION, strategy,
     world_width=WORLD_WIDTH, world_height=WORLD_HEIGHT, resolution=RESOLUTION,
     window_size=8.0, inflation_radius=0.2, max_steps=300,
     corona_margin=CORONA_MARGIN, macro_cell_size=MACRO_CELL_SIZE

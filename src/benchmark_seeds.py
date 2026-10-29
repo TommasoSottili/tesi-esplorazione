@@ -5,6 +5,7 @@ import json
 import time
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from shapely.geometry import Point
 from forest_generator import generate_forest
 from lidar import Lidar
 from exploration import run_exploration
@@ -19,19 +20,31 @@ STRATEGIES = {
     "serpentine": serpentine_strategy,
 }
 
-STRATEGIES_TO_RUN = ["serpentine"]   # sottoinsieme di STRATEGIES da eseguire
+STRATEGIES_TO_RUN = ["random", "frontier", "serpentine"]   # sottoinsieme di STRATEGIES da eseguire
 MACRO_CELL_SIZE = 4.0                # lato delle macro-celle della serpentina (m)
+
+START_POSITIONS = {
+    "center": (10.0, 10.0, 0.0),
+    "corner": (0.1, 0.1, 0.0),   # centro della cella nell'angolo in basso a sinistra
+}
+START = "corner"                     # "center" | "corner"
+START_POSITION = START_POSITIONS[START]
 
 WORLD_WIDTH = 20.0
 WORLD_HEIGHT = 20.0
 RESOLUTION = 0.2
-START_POSITION = (10.0, 10.0, 0.0)
 
-# il test originale (tre strategie, macro-celle da 1 m) mantiene i nomi di file storici
-if STRATEGIES_TO_RUN == list(STRATEGIES) and MACRO_CELL_SIZE == 1.0:
-    OUTPUT_NAME = "benchmark_50seeds"
-else:
-    OUTPUT_NAME = f"benchmark_{'_'.join(STRATEGIES_TO_RUN)}_macro{MACRO_CELL_SIZE:g}_50seeds"
+# i test gia' eseguiti mantengono i loro nomi di file: la dimensione delle macro-celle compare
+# solo se diversa dal test originale da 1 m, il punto di partenza solo se diverso dal centro
+name_parts = ["benchmark"]
+if STRATEGIES_TO_RUN != list(STRATEGIES):
+    name_parts.append("_".join(STRATEGIES_TO_RUN))
+if not (STRATEGIES_TO_RUN == list(STRATEGIES) and MACRO_CELL_SIZE == 1.0):
+    name_parts.append(f"macro{MACRO_CELL_SIZE:g}")
+if START != "center":
+    name_parts.append(START)
+name_parts.append("50seeds")
+OUTPUT_NAME = "_".join(name_parts)
 
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
 CSV_PATH = os.path.join(RESULTS_DIR, f"{OUTPUT_NAME}.csv")
@@ -52,8 +65,10 @@ def load_done_runs():
 
 def run_single(seed, strategy_name):
     # il bosco va rigenerato prima di ogni run: generate_forest fissa anche il seed
-    # del generatore casuale usato dalle strategie, ed e' questo a rendere il run riproducibile
-    forest = generate_forest(20, 20, n_trees=15, n_rocks=3, seed=seed)
+    # del generatore casuale usato dalle strategie, ed e' questo a rendere il run riproducibile.
+    # start_point lascia libera da ostacoli l'area attorno al punto di partenza del robot
+    forest = generate_forest(20, 20, n_trees=15, n_rocks=3, seed=seed,
+                             start_point=Point(START_POSITION[0], START_POSITION[1]))
     sensor = Lidar(n_rays=360, r_max=4.0)
 
     t0 = time.perf_counter()

@@ -8,11 +8,20 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 
+START = "corner"   # "center" | "corner": punto di partenza del test da rappresentare
+
+# per ogni partenza: file dei dati e suffisso dei grafici (il test dal centro mantiene i nomi originali)
+DATASETS = {
+    "center": ("final_50seeds", ""),
+    "corner": ("benchmark_macro4_corner_50seeds", "_corner"),
+}
+DATA_NAME, OUTPUT_SUFFIX = DATASETS[START]
+
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
-COVERAGE_PATH = os.path.join(RESULTS_DIR, "final_50seeds_coverage.jsonl")
-RUNS_PATH = os.path.join(RESULTS_DIR, "final_50seeds.csv")
-OUTPUT_BASE = os.path.join(RESULTS_DIR, "coverage_vs_distance")
-FINAL_OUTPUT_BASE = os.path.join(RESULTS_DIR, "final_coverage_per_run")
+COVERAGE_PATH = os.path.join(RESULTS_DIR, f"{DATA_NAME}_coverage.jsonl")
+RUNS_PATH = os.path.join(RESULTS_DIR, f"{DATA_NAME}.csv")
+OUTPUT_BASE = os.path.join(RESULTS_DIR, f"coverage_vs_distance{OUTPUT_SUFFIX}")
+FINAL_OUTPUT_BASE = os.path.join(RESULTS_DIR, f"final_coverage_per_run{OUTPUT_SUFFIX}")
 
 BLOCKED_THRESHOLD = 90.0
 
@@ -57,6 +66,17 @@ def mean_curve(runs, length):
     return padded.mean(axis=0)
 
 
+def spread_labels(values, min_gap):
+    # etichette con valori troppo vicini si sovrappongono: le distanzio di almeno min_gap,
+    # spostando il gruppo in modo che resti centrato sui valori reali
+    order = sorted(values, key=values.get, reverse=True)
+    positions = {}
+    for i, name in enumerate(order):
+        positions[name] = values[name] if i == 0 else min(values[name], positions[order[i - 1]] - min_gap)
+    shift = np.mean([values[name] - positions[name] for name in order])
+    return {name: positions[name] + shift for name in order}
+
+
 def main():
     curves = load_curves()
     length = max(len(r) for runs in curves.values() for r in runs)
@@ -69,7 +89,11 @@ def main():
         means[name] = mean_curve(curves[name], length)
         ax.plot(distance, means[name], color=style["color"], linestyle="--",
                 linewidth=1.8, label=style["label"])
-        ax.annotate(f"{means[name][-1]:.1f}%", xy=(distance[-1], means[name][-1]),
+
+    final_values = {name: means[name][-1] for name in SERIES}
+    label_y = spread_labels(final_values, min_gap=3.3)
+    for name in SERIES:
+        ax.annotate(f"{final_values[name]:.1f}%", xy=(distance[-1], label_y[name]),
                     xytext=(6, 0), textcoords="offset points", va="center",
                     fontsize=9, color=INK_SECONDARY, annotation_clip=False)
 
@@ -125,7 +149,10 @@ def plot_final_coverage():
                    edgecolors="white", linewidths=0.8, zorder=3)
 
         blocked = [r for r in runs if float(r["coverage_pct"]) < BLOCKED_THRESHOLD]
-        count_text = f"{len(blocked)} bloccati su {len(runs)}" if blocked else f"nessun blocco su {len(runs)}"
+        if not blocked:
+            count_text = f"nessun blocco su {len(runs)}"
+        else:
+            count_text = f"{len(blocked)} {'bloccato' if len(blocked) == 1 else 'bloccati'} su {len(runs)}"
         ax.text(101.5, y, count_text, va="center", fontsize=9, color=INK_PRIMARY, clip_on=False)
         print(f"  {name:10s} {len(blocked):2d} | " +
               ", ".join(f"seed {r['seed']} ({float(r['coverage_pct']):.1f}%)" for r in blocked))
