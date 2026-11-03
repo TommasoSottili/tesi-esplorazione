@@ -9,7 +9,7 @@ from shapely.geometry import Point
 from forest_generator import generate_forest
 from lidar import Lidar
 from exploration import run_exploration
-from strategies import random_strategy, frontier_strategy, serpentine_strategy
+from strategies import random_strategy, frontier_strategy, serpentine_strategy, frontier_weighted_strategy
 
 SEEDS = list(range(1, 51))
 N_WORKERS = 6   # run eseguiti in parallelo (1 = in sequenza)
@@ -18,29 +18,33 @@ STRATEGIES = {
     "random": random_strategy,
     "frontier": frontier_strategy,
     "serpentine": serpentine_strategy,
+    "frontier_weighted": frontier_weighted_strategy,
 }
+BASE_STRATEGIES = ["random", "frontier", "serpentine"]   # le tre strategie del confronto principale
 
-STRATEGIES_TO_RUN = ["random", "frontier", "serpentine"]   # sottoinsieme di STRATEGIES da eseguire
+STRATEGIES_TO_RUN = ["frontier_weighted"]   # sottoinsieme di STRATEGIES da eseguire
 MACRO_CELL_SIZE = 4.0                # lato delle macro-celle della serpentina (m)
+CLUTTER_WEIGHT = 2.0                 # peso delle celle bloccate nel frontier pesato (tarato sui seed 51-90)
 
 START_POSITIONS = {
     "center": (10.0, 10.0, 0.0),
     "corner": (0.1, 0.1, 0.0),   # centro della cella nell'angolo in basso a sinistra
 }
-START = "corner"                     # "center" | "corner"
+START = "center"                     # "center" | "corner"
 START_POSITION = START_POSITIONS[START]
 
 WORLD_WIDTH = 20.0
 WORLD_HEIGHT = 20.0
 RESOLUTION = 0.2
 
-# i test gia' eseguiti mantengono i loro nomi di file: la dimensione delle macro-celle compare
-# solo se diversa dal test originale da 1 m, il punto di partenza solo se diverso dal centro
+
 name_parts = ["benchmark"]
-if STRATEGIES_TO_RUN != list(STRATEGIES):
+if STRATEGIES_TO_RUN != BASE_STRATEGIES:
     name_parts.append("_".join(STRATEGIES_TO_RUN))
-if not (STRATEGIES_TO_RUN == list(STRATEGIES) and MACRO_CELL_SIZE == 1.0):
+if "serpentine" in STRATEGIES_TO_RUN and not (STRATEGIES_TO_RUN == BASE_STRATEGIES and MACRO_CELL_SIZE == 1.0):
     name_parts.append(f"macro{MACRO_CELL_SIZE:g}")
+if "frontier_weighted" in STRATEGIES_TO_RUN:
+    name_parts.append(f"w{CLUTTER_WEIGHT:g}")
 if START != "center":
     name_parts.append(START)
 name_parts.append("50seeds")
@@ -64,9 +68,7 @@ def load_done_runs():
 
 
 def run_single(seed, strategy_name):
-    # il bosco va rigenerato prima di ogni run: generate_forest fissa anche il seed
-    # del generatore casuale usato dalle strategie, ed e' questo a rendere il run riproducibile.
-    # start_point lascia libera da ostacoli l'area attorno al punto di partenza del robot
+    
     forest = generate_forest(20, 20, n_trees=15, n_rocks=3, seed=seed,
                              start_point=Point(START_POSITION[0], START_POSITION[1]))
     sensor = Lidar(n_rays=360, r_max=4.0)
@@ -75,7 +77,7 @@ def run_single(seed, strategy_name):
     global_map, _, stats = run_exploration(
         forest, sensor, START_POSITION, STRATEGIES[strategy_name],
         world_width=WORLD_WIDTH, world_height=WORLD_HEIGHT, resolution=RESOLUTION,
-        macro_cell_size=MACRO_CELL_SIZE
+        macro_cell_size=MACRO_CELL_SIZE, clutter_weight=CLUTTER_WEIGHT
     )
     time_ms = (time.perf_counter() - t0) * 1000
 
@@ -124,7 +126,6 @@ def write_summary():
 
 
 def sort_csv():
-    # i run in parallelo finiscono in ordine sparso: riordino per seed e strategia
     with open(CSV_PATH, newline="") as f:
         rows = list(csv.DictReader(f))
     order = STRATEGIES_TO_RUN

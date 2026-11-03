@@ -1,0 +1,2 @@
+strategy,n_runs,coverage_mean,coverage_median,distance_mean_m,time_mean_ms
+frontier_weighted,50,96.05,96.24,149.5,63390

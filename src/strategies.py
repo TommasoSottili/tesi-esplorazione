@@ -1,6 +1,7 @@
 
 import random
 import numpy as np
+from global_map import OCCUPIED
 
 
 def random_strategy(global_map, frontiers, robot_cell, context):
@@ -24,11 +25,34 @@ def frontier_strategy(global_map, frontiers, robot_cell, context):
     return random.choice(nearest_frontiers)
 
 
+def count_blocked_cells(grid, window_size=5):
+
+    
+    half = window_size // 2
+    blocked = np.pad(grid >= OCCUPIED, half, constant_values=True)
+    windows = np.lib.stride_tricks.sliding_window_view(blocked, (window_size, window_size))
+    return windows.sum(axis=(2, 3))
+
+
+def frontier_weighted_strategy(global_map, frontiers, robot_cell, context):
+
+    if not frontiers:
+        return None
+
+    
+    distances = context["distances"]
+    weight = context["clutter_weight"]
+    blocked = count_blocked_cells(global_map.grid)
+    costs = {f: distances[f] + weight * blocked[f[0]][f[1]] for f in frontiers}
+    min_cost = min(costs.values())
+    best_frontiers = [f for f in frontiers if costs[f] == min_cost]
+
+    return random.choice(best_frontiers)
+
+
 def compute_serpentine_rank(n_rows, n_cols, resolution, macro_cell_size=1.0):
    
-    # Restituisce comunque un array sulla griglia fine (n_rows x n_cols), ogni
-    # cella fine porta il rango della macro-cella che la contiene. Così
-    # serpentine_strategy resta invariata
+   
     cells_per_macro = int(round(macro_cell_size / resolution))
     if cells_per_macro < 1:
         cells_per_macro = 1

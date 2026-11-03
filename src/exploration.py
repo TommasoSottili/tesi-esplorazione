@@ -9,7 +9,7 @@ from strategies import compute_serpentine_rank
 def run_exploration(forest, sensor, start_position, strategy,
                      world_width=20.0, world_height=20.0, resolution=0.2,
                      window_size=8.0, inflation_radius=0.2, max_steps=300,
-                     macro_cell_size=1.0, corona_margin=0.6):
+                     macro_cell_size=1.0, corona_margin=0.6, clutter_weight=2.0):
     
     robot_state = start_position
     global_map = GlobalMap(world_width, world_height, resolution)
@@ -71,7 +71,7 @@ def run_exploration(forest, sensor, start_position, strategy,
             if not frontiers:
                 break   # nessuna frontiera nota è raggiungibile (o utile): mi fermo per sicurezza
 
-            context = {"distances": distances, "rank": rank}
+            context = {"distances": distances, "rank": rank, "clutter_weight": clutter_weight}
             target_cell = strategy(global_map, frontiers, robot_cell, context)
 
             if target_cell is None:
