@@ -11,3 +11,14 @@ __pycache__/
 
 # Output generati (frame e gif dei film di esplorazione)
 output/
+
+# File generati dalla compilazione LaTeX della relazione
+relazione/*.aux
+relazione/*.log
+relazione/*.out
+relazione/*.toc
+relazione/*.lof
+relazione/*.lot
+relazione/*.bbl
+relazione/*.blg
+relazione/*.synctex.gz

@@ -1,0 +1,131 @@
+\chapter{Implementazione software}
+\label{cap:implementazione}
+
+\section{Strumenti e librerie}
+\label{sec:strumenti}
+
+Il simulatore è scritto in Python ed è stato sviluppato ed eseguito con la versione 3.14 dell'interprete. Le librerie esterne sono installate in un ambiente virtuale riservato al progetto e le loro versioni sono indicate nel file \texttt{requirements.txt}, così che l'ambiente in cui sono state effettuate le varie simulazioni possa essere ricostruito in modo identico. Il codice fa uso di quattro librerie, riportate con le rispettive versioni nella Tabella~\ref{tab:librerie}, mentre le altre voci del file sono dipendenze che vengono installate automaticamente insieme a queste. Il codice, i risultati delle prove e questa relazione sono gestiti con il sistema di controllo di versione Git, in cui è salvato l' intero lavoro e la sua progressiva evoluzione.
+
+La libreria Shapely fornisce le operazioni e gli strumenti geometrici su cui si basa il modello dell'ambiente descritto nella Sezione~\ref{sec:ambiente}. Ogni albero viene costruito con l'operazione di \emph{buffer}, che a partire dal centro restituisce l'insieme dei punti distanti da esso meno del raggio e approssima la circonferenza con un poligono di 64 lati, mentre ogni roccia è un poligono definito dalla lista dei suoi vertici. Il generatore del bosco utilizza la stessa libreria per controllare che un nuovo ostacolo non si sovrapponga a quelli già presenti, che sia contenuto nell'area e che non si trovi troppo vicino al punto di partenza del robot. Nel modello del sensore ogni raggio è un segmento, di cui viene calcolata l'intersezione con l'unione di tutti gli ostacoli, e la misura restituita è il punto di questa intersezione più vicino al robot. Dal momento che gli ostacoli non cambiano durante l'esplorazione, la loro unione viene calcolata una sola volta e conservata, per cui i 360 raggi di ogni scansione la riutilizzano senza ricalcolarla.
+
+La mappa globale e la griglia locale sono matrici di numeri interi della libreria NumPy, nelle quali i valori da 0 a 3 corrispondono agli stati delle celle introdotti nella Sezione~\ref{sec:stati}. La maggior parte delle operazioni sulle celle, come la fusione della griglia locale nella mappa globale, l'inflazione e la ricerca delle frontiere, è scritta con cicli espliciti che seguono da vicino la descrizione del Capitolo~\ref{cap:metodologia}. Le operazioni vettoriali di NumPy sono usate invece dove riguardano l'intera mappa e si esprimono in modo diretto, come il conteggio delle celle note da cui si ricava la copertura e il conteggio delle celle bloccate nella finestra attorno a ogni cella, usato dalla scelta pesata.
+
+I grafici dei risultati, le figure di questa relazione e i fotogrammi dei filmati dell'esplorazione sono prodotti con Matplotlib. Gli script che generano file impostano il motore di disegno non interattivo della libreria, in modo da poter essere eseguiti senza aprire finestre, e salvano ogni figura sia in formato PDF, vettoriale, usato in questa relazione, sia in formato PNG. La libreria Pillow converte i fotogrammi in immagini e li compone in un unico filmato in formato GIF.
+
+Tra i moduli della libreria standard di Python, il modulo \texttt{random} genera le posizioni e le dimensioni degli ostacoli e anche le scelte casuali delle strategie, a partire dallo stesso seme (Sezione~\ref{sec:riproducibilita}). La ricerca in ampiezza usata per calcolare le distanze delle frontiere si appoggia alla coda \texttt{deque} del modulo \texttt{collections}, mentre l'algoritmo di Dijkstra usa la coda con priorità del modulo \texttt{heapq}. Il modulo \texttt{concurrent.futures} permette di eseguire più esplorazioni in parallelo su processi distinti, e i moduli \texttt{csv} e \texttt{json} sono usati per salvare i risultati delle prove (Sezione~\ref{sec:sperimentazione}).
+
+\begin{table}[!htb]
+    \centering
+    \small
+    \begin{tabular}{@{}llp{0.55\textwidth}@{}}
+        \toprule
+        Libreria & Versione & Uso nel simulatore \\
+        \midrule
+        NumPy & 2.5.2 & Griglie della mappa e calcoli sui punti della scansione \\
+        Shapely & 2.1.2 & Geometria degli ostacoli e intersezione dei raggi \\
+        Matplotlib & 3.11.1 & Grafici, figure e fotogrammi dei filmati \\
+        Pillow & 12.3.0 & Composizione dei fotogrammi in filmati GIF \\
+        \bottomrule
+    \end{tabular}
+    \caption{Librerie esterne usate dal simulatore.}
+    \label{tab:librerie}
+\end{table}
+
+\section{Architettura del codice}
+\label{sec:architettura}
+
+Il codice è organizzato in moduli Python raccolti in un'unica cartella, \texttt{src}, che si dividono in tre gruppi. Il primo comprende il simulatore vero e proprio, che realizza il sistema descritto nel Capitolo~\ref{cap:metodologia}, cioè l'ambiente, il sensore, la mappa, la pianificazione dei percorsi, le strategie e il ciclo di esplorazione, mentre il secondo raccoglie gli script che eseguono le prove e ne elaborano i risultati e il terzo quelli che producono i filmati e le figure. A questi si aggiungono otto script di verifica dedicati alle singole parti del simulatore, descritti nella Sezione~\ref{sec:riproducibilita}. La Tabella~\ref{tab:moduli} elenca i moduli con il loro compito e il punto della relazione in cui è descritto il modello o il risultato corrispondente.
+
+Le dipendenze tra i moduli del simulatore hanno un solo verso, dai moduli che descrivono il mondo e la mappa verso quello che li usa durante l'esplorazione. Il modulo \texttt{environment.py} definisce la classe che contiene i confini dell'area e gli ostacoli, mentre \texttt{forest\_generator.py} crea un ambiente di questo tipo e lo popola con ostacoli disposti casualmente. Il modulo \texttt{lidar.py} è quello ripreso da~\cite{gennai2026} ed è stato riutilizzato senza modifiche, a parte il valore predefinito della portata, portato da 6 a 4~m. Il sensore interagisce con l'ambiente soltanto attraverso il metodo che calcola la prima intersezione di un segmento con gli ostacoli, per cui non dipende dal modo in cui il bosco viene generato. I moduli \texttt{local\_grid.py} e \texttt{global\_map.py} contengono rispettivamente la costruzione della griglia locale e le operazioni sulla mappa globale, cioè la fusione, l'inflazione e la ricerca delle frontiere. Il secondo definisce anche le costanti che codificano gli stati delle celle, usate da \texttt{pathfinding.py}, che contiene la ricerca in ampiezza e l'algoritmo di Dijkstra, e da \texttt{strategies.py}, che contiene le quattro strategie e il calcolo dell'ordine delle macro-celle della serpentina.
+
+Il ciclo di esplorazione è realizzato nel modulo \texttt{exploration.py} dalla funzione \texttt{run\_exploration}, la quale richiama la costruzione della griglia locale, le operazioni sulla mappa e la pianificazione. L'ambiente, il sensore e la strategia non sono creati all'interno della funzione ma le vengono passati come argomenti, e la strategia in particolare è una funzione Python. Ne risulta che lo stesso ciclo viene eseguito senza modifiche con tutte le strategie e su tutti i boschi, e che una nuova strategia richiede soltanto di scrivere una funzione che rispetti l'interfaccia comune descritta nella Sezione~\ref{sec:strutture}. Gli script di sperimentazione e di visualizzazione seguono tutti lo stesso schema, nel quale si genera il bosco a partire da un seme, si crea il sensore, si esegue \texttt{run\_exploration} con la strategia scelta e infine si salvano o si disegnano i risultati.
+
+\begin{table}[!htb]
+    \centering
+    \small
+    \begin{tabular}{@{}lp{0.45\textwidth}l@{}}
+        \toprule
+        Modulo & Compito & Riferimento \\
+        \midrule
+        \multicolumn{3}{@{}l}{\emph{Simulatore}} \\
+        \texttt{environment.py} & Area, ostacoli e intersezione di un segmento con gli ostacoli & Sez.~\ref{sec:ambiente} \\
+        \texttt{forest\_generator.py} & Generazione casuale del bosco a partire da un seme & Sez.~\ref{sec:ambiente} \\
+        \texttt{lidar.py} & Modello del sensore LiDAR, ripreso da~\cite{gennai2026} & Sez.~\ref{sec:lidar} \\
+        \texttt{local\_grid.py} & Costruzione della griglia locale da una scansione & Sez.~\ref{sec:aggiornamento}, \ref{sec:margini} \\
+        \texttt{global\_map.py} & Mappa globale, con fusione, inflazione e ricerca delle frontiere & Sez.~\ref{sec:mappa}, \ref{sec:frontiere} \\
+        \texttt{pathfinding.py} & Ricerca in ampiezza e algoritmo di Dijkstra & Sez.~\ref{sec:frontiere}, \ref{sec:pianificazione} \\
+        \texttt{strategies.py} & Strategie di scelta della destinazione e ordine della serpentina & Sez.~\ref{sec:strategie} \\
+        \texttt{exploration.py} & Ciclo di esplorazione & Sez.~\ref{sec:ciclo} \\
+        \midrule
+        \multicolumn{3}{@{}l}{\emph{Sperimentazione}} \\
+        \texttt{benchmark\_seeds.py} & Prove sui 50 boschi e riepilogo dei risultati & Sez.~\ref{sec:protocollo} \\
+        \texttt{calibrate\_clutter\_weight.py} & Prove per la scelta del peso $w$ & Sez.~\ref{sec:protocollo} \\
+        \texttt{plot\_coverage.py} & Grafici della copertura & Cap.~\ref{cap:risultati} \\
+        \midrule
+        \multicolumn{3}{@{}l}{\emph{Visualizzazione}} \\
+        \texttt{render.py} & Disegno di un fotogramma dell'esplorazione & Sez.~\ref{sec:visualizzazione} \\
+        \texttt{frame\_generator.py} & Filmato di un'esplorazione & Sez.~\ref{sec:visualizzazione} \\
+        \texttt{plot\_forest\_example.py} & Figura del bosco di esempio & Fig.~\ref{fig:bosco} \\
+        \texttt{plot\_lidar\_scan.py} & Figura della scansione & Fig.~\ref{fig:scansione} \\
+        \texttt{plot\_first\_scan\_map.py} & Figura della mappa dopo la prima scansione & Fig.~\ref{fig:mappa} \\
+        \midrule
+        \multicolumn{3}{@{}l}{\emph{Verifica}} \\
+        \texttt{test\_*.py} & Otto script di verifica visiva dei moduli del simulatore & Sez.~\ref{sec:riproducibilita} \\
+        \bottomrule
+    \end{tabular}
+    \caption{Moduli del codice, raggruppati per funzione.}
+    \label{tab:moduli}
+\end{table}
+
+\section{Strutture dati e interfaccia delle strategie}
+\label{sec:strutture}
+
+Le parti del simulatore si scambiano dati di pochi tipi, cioè la geometria dell'ambiente, i punti misurati dal sensore, le matrici della mappa e le celle che individuano frontiere, percorsi e destinazioni.
+
+\subsection{Ambiente e scansione}
+\label{sec:dati_ambiente}
+
+L'ambiente è un oggetto della classe \texttt{Environment}, che contiene il rettangolo dei confini dell'area e la lista degli ostacoli, entrambi rappresentati come poligoni di Shapely. Il generatore del bosco restituisce un oggetto di questa classe già popolato, che durante l'esplorazione non viene più modificato. L'unione degli ostacoli, usata per il calcolo delle intersezioni, viene costruita alla prima scansione e conservata insieme a un indicatore della sua validità, per cui viene ricalcolata soltanto quando si aggiunge un nuovo ostacolo.
+
+Lo stato del robot è una terna $(x, y, \theta)$, con le coordinate in metri e l'orientamento in radianti, nella forma richiesta dal modello del sensore. Poiché l'orientamento del robot non viene considerato (Sezione~\ref{sec:ambiente}), il terzo valore è sempre nullo. Una scansione restituisce una matrice NumPy di 360 righe e 2 colonne, con le coordinate dei punti misurati nel sistema di riferimento dell'area. Per i raggi che non incontrano ostacoli il punto restituito è l'estremo del raggio alla portata massima, per cui i punti di contatto si distinguono dagli altri confrontando la loro distanza dal robot con la portata, con una tolleranza di $10^{-6}$~m che assorbe gli errori di arrotondamento. I punti di contatto di ogni scansione vengono conservati separatamente e la loro unione forma la nuvola di punti dell'esplorazione.
+
+\subsection{Mappa e conversione delle coordinate}
+\label{sec:dati_mappa}
+
+La mappa globale è un oggetto della classe \texttt{GlobalMap}, che conserva le dimensioni dell'area, il lato delle celle e la matrice degli stati, cioè una matrice NumPy di numeri interi di 100 righe e 100 colonne, inizializzata con il valore dello stato sconosciuto. Gli stati sono codificati dalle costanti \texttt{UNKNOWN}, \texttt{FREE}, \texttt{OCCUPIED} e \texttt{INFLATED}, con i valori da 0 a 3, definite nello stesso modulo e importate dagli altri. Una cella è individuata dalla coppia (riga, colonna), in cui la riga corrisponde alla coordinata $y$ e la colonna alla coordinata $x$, e la cella $(0, 0)$ è quella nell'angolo in basso a sinistra dell'area. La conversione da un punto $(x, y)$ alla cella che lo contiene divide ciascuna coordinata per il lato della cella e ne prende la parte intera, dopo aver aggiunto una tolleranza di $10^{-9}$ che impedisce a un punto che si trova esattamente sul lato tra due celle di essere assegnato alla cella precedente per un errore di arrotondamento. Un punto esterno all'area non ha una cella corrispondente, e in questo caso la funzione restituisce il valore \texttt{None}, che il codice chiamante gestisce scartando il punto. La conversione inversa associa a una cella il suo centro, e dopo ogni spostamento il robot viene posto nel centro della nuova cella.
+
+La griglia locale è una matrice dello stesso tipo, di 40 $\times$ 40 celle, che copre il quadrato di 8~m di lato centrato sul robot e usa gli stessi codici per gli stati sconosciuto, libero e occupato, mentre lo stato di sicurezza esiste soltanto nella mappa globale. Nella fusione la cella della griglia locale di indici $(i, j)$ viene associata alla cella della mappa globale $(r - 20 + i,\, c - 20 + j)$, dove $(r, c)$ è la cella del robot, e le celle che cadono fuori dall'area vengono scartate.
+% NOTA (verifica in corso): con il robot al centro di una cella la griglia locale
+% risulta sfasata di mezza cella rispetto a questa corrispondenza. Da decidere
+% con l'autore prima di rileggere questo paragrafo.
+
+Le altre strutture usano i tipi di base di Python. Le frontiere sono una lista di coppie (riga, colonna), le distanze calcolate con la ricerca in ampiezza sono un dizionario che associa a ogni cella raggiungibile il numero di passi necessari per raggiungerla, e un percorso è la lista delle celle da attraversare, dalla cella del robot alla destinazione comprese. A ogni spostamento la prima cella viene tolta dalla lista, per cui la seconda è sempre la prossima cella da controllare. L'ordine della serpentina è una matrice delle stesse dimensioni della mappa, che contiene per ogni cella il rango della macro-cella a cui appartiene e viene calcolata una sola volta all'inizio dell'esplorazione. Anche il conteggio delle celle bloccate usato dalla scelta pesata è una matrice di questo tipo, che viene però ricalcolata a ogni decisione perché dipende dallo stato della mappa. Per ottenerla si costruisce la matrice booleana delle celle occupate o di sicurezza, la si estende con due file di celle bloccate su ogni lato, in modo che le celle esterne all'area vengano contate come bloccate, e si sommano i valori di ogni finestra di 5 $\times$ 5 celle con la funzione \texttt{sliding\_window\_view} di NumPy.
+
+\subsection{Interfaccia delle strategie}
+\label{sec:interfaccia}
+
+Tutte le strategie sono funzioni con la stessa firma, \texttt{strategy(global\_map, frontiers, robot\_cell, context)}, che ricevono la mappa globale, la lista delle frontiere candidate, la cella del robot e un dizionario di informazioni aggiuntive, e restituiscono la cella scelta come destinazione. La lista delle frontiere arriva alla strategia già filtrata dal ciclo di esplorazione, che ha escluso le frontiere irraggiungibili, la cella del robot e le frontiere bloccate (Sezione~\ref{sec:frontiere}), per cui la strategia si occupa soltanto della scelta.
+
+Il dizionario \texttt{context} contiene le distanze delle celle raggiungibili, la matrice dell'ordine della serpentina e il peso $w$ della scelta pesata, e ogni strategia legge soltanto le voci di cui ha bisogno. La strategia casuale non ne usa alcuna, quella basata sulle frontiere usa le distanze e quella a serpentina la matrice dell'ordine, mentre la variante con scelta pesata usa le distanze e il peso, insieme alla mappa globale su cui conta le celle bloccate. La cella del robot non è usata da nessuna delle quattro strategie, ma fa comunque parte dell'interfaccia, perché potrebbe servire a una strategia basata, per esempio, sulla distanza in linea d'aria. Le strategie diverse da quella casuale calcolano per ogni frontiera un valore, che è la distanza, il rango della macro-cella o il costo dell'Equazione~\eqref{eq:costo}, raccolgono le frontiere con il valore minimo e scelgono tra queste con la funzione \texttt{random.choice}, che risolve i casi di parità in modo casuale.
+
+Con questa interfaccia, per aggiungere una strategia è sufficiente scrivere una nuova funzione e registrarla con un nome nel dizionario delle strategie degli script di sperimentazione e di visualizzazione. Se la nuova strategia ha bisogno di un'informazione che il ciclo non fornisce ancora, questa viene aggiunta come nuova voce del dizionario \texttt{context}, senza modificare le strategie esistenti.
+
+\section{La funzione di esplorazione}
+\label{sec:esplorazione}
+
+% DA SCRIVERE
+
+\section{Riproducibilità e verifica}
+\label{sec:riproducibilita}
+
+% DA SCRIVERE
+
+\section{Strumenti di sperimentazione}
+\label{sec:sperimentazione}
+
+% DA SCRIVERE
+
+\section{Visualizzazione}
+\label{sec:visualizzazione}
+
+% DA SCRIVERE

@@ -1,0 +1,71 @@
+
+\documentclass[11pt,a4paper,twoside,openright]{book}
+
+% == Lingua e caratteri
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage{lmodern}
+
+% == Pagina: margini (con rilegatura) e interlinea come nel template
+\usepackage[big,binding=1.5cm]{layaureo}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{emptypage}  
+\raggedbottom            
+\setlength{\emergencystretch}{3em}  
+
+% == Matematica
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% == Figure e tabelle
+\usepackage{graphicx}
+\graphicspath{{figure/}}
+\usepackage[labelfont=bf,format=hang]{caption}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc}
+\usepackage[section]{placeins}   
+\let\oldsubsection\subsection   
+\renewcommand{\subsection}{\FloatBarrier\oldsubsection}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\itshape\thepage}
+\fancyhead[RE]{\itshape\leftmark}
+\fancyhead[LO]{\itshape\rightmark}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{14pt}
+\renewcommand{\chaptermark}[1]{\markboth{\thechapter.\ #1}{}}
+\renewcommand{\sectionmark}[1]{\markright{\thesection\ #1}}
+
+\setcounter{secnumdepth}{3}   
+\setcounter{tocdepth}{3}      
+
+\usepackage[numbers]{natbib}
+\usepackage[colorlinks=true,linkcolor=black,citecolor=black,urlcolor=black,bookmarksnumbered=true]{hyperref}
+
+
+\begin{document}
+
+\frontmatter
+\input{frontespizio}
+
+\tableofcontents
+%\listoffigures
+
+\mainmatter
+\input{capitoli/introduzione}
+\input{capitoli/metodologia}
+\input{capitoli/implementazione}
+\input{capitoli/risultati}
+\input{capitoli/conclusioni}
+
+\backmatter
+\renewcommand{\bibsection}{\chapter*{\bibname}\markboth{\bibname}{\bibname}\addcontentsline{toc}{chapter}{\bibname}}
+\bibliographystyle{unsrtnat}
+\bibliography{bibliografia}
+
+\end{document}
