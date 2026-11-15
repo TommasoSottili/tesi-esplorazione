@@ -30,6 +30,30 @@
 \let\oldsubsection\subsection   
 \renewcommand{\subsection}{\FloatBarrier\oldsubsection}
 
+% == Estratti di codice
+\usepackage{listings}
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\bfseries,
+    commentstyle=\itshape\color{black!60},
+    stringstyle=\color{black!75},
+    numbers=left,
+    numberstyle=\tiny\color{black!60},
+    numbersep=8pt,
+    frame=lines,
+    framesep=4pt,
+    xleftmargin=1.5em,
+    columns=fullflexible,
+    keepspaces=true,
+    showstringspaces=false,
+    breaklines=true,
+    captionpos=b,
+    aboveskip=1em,
+    belowskip=1em
+}
+\renewcommand{\lstlistingname}{Listato}
+
 \usepackage{fancyhdr}
 \pagestyle{fancy}
 \fancyhf{}

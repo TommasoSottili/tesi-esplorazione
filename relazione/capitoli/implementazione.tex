@@ -4,9 +4,9 @@
 \section{Strumenti e librerie}
 \label{sec:strumenti}
 
-Il simulatore è scritto in Python ed è stato sviluppato ed eseguito con la versione 3.14 dell'interprete. Le librerie esterne sono installate in un ambiente virtuale riservato al progetto e le loro versioni sono indicate nel file \texttt{requirements.txt}, così che l'ambiente in cui sono state effettuate le varie simulazioni possa essere ricostruito in modo identico. Il codice fa uso di quattro librerie, riportate con le rispettive versioni nella Tabella~\ref{tab:librerie}, mentre le altre voci del file sono dipendenze che vengono installate automaticamente insieme a queste. Il codice, i risultati delle prove e questa relazione sono gestiti con il sistema di controllo di versione Git, in cui è salvato l' intero lavoro e la sua progressiva evoluzione.
+Il simulatore è scritto in Python ed è stato sviluppato ed eseguito con la versione 3.14 dell'interprete. Le librerie esterne sono installate in un ambiente virtuale riservato al solo progetto e le loro versioni sono indicate nel file \texttt{requirements.txt}, così che l'ambiente in cui sono state effettuate le varie simulazioni possa essere ricostruito e riutilizzato in modo identico. Il codice fa uso di quattro librerie, riportate con le rispettive versioni nella Tabella~\ref{tab:librerie}, mentre le altre voci del file sono dipendenze che vengono installate automaticamente insieme a queste. Il codice, i risultati delle prove e la relazione stessa sono gestiti con il sistema di controllo di versione Git, in cui è salvato l'intero lavoro e la sua progressiva evoluzione.
 
-La libreria Shapely fornisce le operazioni e gli strumenti geometrici su cui si basa il modello dell'ambiente descritto nella Sezione~\ref{sec:ambiente}. Ogni albero viene costruito con l'operazione di \emph{buffer}, che a partire dal centro restituisce l'insieme dei punti distanti da esso meno del raggio e approssima la circonferenza con un poligono di 64 lati, mentre ogni roccia è un poligono definito dalla lista dei suoi vertici. Il generatore del bosco utilizza la stessa libreria per controllare che un nuovo ostacolo non si sovrapponga a quelli già presenti, che sia contenuto nell'area e che non si trovi troppo vicino al punto di partenza del robot. Nel modello del sensore ogni raggio è un segmento, di cui viene calcolata l'intersezione con l'unione di tutti gli ostacoli, e la misura restituita è il punto di questa intersezione più vicino al robot. Dal momento che gli ostacoli non cambiano durante l'esplorazione, la loro unione viene calcolata una sola volta e conservata, per cui i 360 raggi di ogni scansione la riutilizzano senza ricalcolarla.
+La libreria Shapely fornisce le operazioni e gli strumenti geometrici su cui si basa il modello dell'ambiente boschivo descritto nella Sezione~\ref{sec:ambiente}. Ogni albero viene costruito con l'operazione di \emph{buffer}, che a partire dal centro restituisce l'insieme dei punti distanti da esso meno del raggio e approssima la circonferenza con un poligono di 64 lati, mentre ogni roccia è un poligono definito dalla lista dei suoi vertici. Il generatore del bosco utilizza la stessa libreria per controllare che un nuovo ostacolo non si sovrapponga a quelli già presenti, che sia contenuto nell'area e che non si trovi troppo vicino al punto di partenza del robot (Listato~\ref{lst:generatore}). Nel modello del sensore ogni raggio è un segmento, di cui viene calcolata l'intersezione con l'unione di tutti gli ostacoli, e la misura restituita è il punto di questa intersezione più vicino al robot. Dal momento che gli ostacoli non cambiano durante l'esplorazione, la loro unione viene calcolata una sola volta e conservata, per cui i 360 raggi di ogni scansione la riutilizzano senza ricalcolarla.
 
 La mappa globale e la griglia locale sono matrici di numeri interi della libreria NumPy, nelle quali i valori da 0 a 3 corrispondono agli stati delle celle introdotti nella Sezione~\ref{sec:stati}. La maggior parte delle operazioni sulle celle, come la fusione della griglia locale nella mappa globale, l'inflazione e la ricerca delle frontiere, è scritta con cicli espliciti che seguono da vicino la descrizione del Capitolo~\ref{cap:metodologia}. Le operazioni vettoriali di NumPy sono usate invece dove riguardano l'intera mappa e si esprimono in modo diretto, come il conteggio delle celle note da cui si ricava la copertura e il conteggio delle celle bloccate nella finestra attorno a ogni cella, usato dalla scelta pesata.
 
@@ -85,9 +85,32 @@ Le parti del simulatore si scambiano dati di pochi tipi, cioè la geometria dell
 \subsection{Ambiente e scansione}
 \label{sec:dati_ambiente}
 
-L'ambiente è un oggetto della classe \texttt{Environment}, che contiene il rettangolo dei confini dell'area e la lista degli ostacoli, entrambi rappresentati come poligoni di Shapely. Il generatore del bosco restituisce un oggetto di questa classe già popolato, che durante l'esplorazione non viene più modificato. L'unione degli ostacoli, usata per il calcolo delle intersezioni, viene costruita alla prima scansione e conservata insieme a un indicatore della sua validità, per cui viene ricalcolata soltanto quando si aggiunge un nuovo ostacolo.
+L'ambiente è un oggetto della classe \texttt{Environment}, che contiene il rettangolo dei confini dell'area e la lista degli ostacoli, entrambi rappresentati come poligoni di Shapely. Il generatore del bosco restituisce un oggetto di questa classe già popolato, che durante l'esplorazione non viene più modificato. Il Listato~\ref{lst:generatore} riporta la funzione che controlla le condizioni di accettazione di un nuovo ostacolo, descritte nella Sezione~\ref{sec:ambiente}, e il ciclo che colloca gli alberi con al più 100 tentativi ciascuno, mentre le rocce vengono collocate allo stesso modo, con un poligono al posto del cerchio. L'unione degli ostacoli, usata per il calcolo delle intersezioni, viene costruita alla prima scansione e conservata insieme a un indicatore della sua validità, per cui viene ricalcolata soltanto quando si aggiunge un nuovo ostacolo.
 
 Lo stato del robot è una terna $(x, y, \theta)$, con le coordinate in metri e l'orientamento in radianti, nella forma richiesta dal modello del sensore. Poiché l'orientamento del robot non viene considerato (Sezione~\ref{sec:ambiente}), il terzo valore è sempre nullo. Una scansione restituisce una matrice NumPy di 360 righe e 2 colonne, con le coordinate dei punti misurati nel sistema di riferimento dell'area. Per i raggi che non incontrano ostacoli il punto restituito è l'estremo del raggio alla portata massima, per cui i punti di contatto si distinguono dagli altri confrontando la loro distanza dal robot con la portata, con una tolleranza di $10^{-6}$~m che assorbe gli errori di arrotondamento. I punti di contatto di ogni scansione vengono conservati separatamente e la loro unione forma la nuvola di punti dell'esplorazione.
+
+\begin{lstlisting}[float=!htb, label=lst:generatore, caption={Condizioni di accettazione di un ostacolo e collocazione degli alberi nel generatore del bosco.}]
+# forest_generator.py
+def is_position_valid(geometry, environment, start_point, clearance):
+    for existing_obstacle in environment.obstacles:
+        if geometry.intersects(existing_obstacle):
+            return False
+    if geometry.distance(start_point) < clearance:
+        return False
+    if not environment.bounds.contains(geometry):
+        return False
+    return True
+
+for _ in range(n_trees):
+    for _ in range(max_attempts):
+        cx = random.uniform(0, width)
+        cy = random.uniform(0, height)
+        radius = random.uniform(0.3, 1.0)
+        candidate = Point(cx, cy).buffer(radius)
+        if is_position_valid(candidate, environment, start_point, clearance):
+            environment.add_circle(cx, cy, radius)
+            break
+\end{lstlisting}
 
 \subsection{Mappa e conversione delle coordinate}
 \label{sec:dati_mappa}
@@ -106,9 +129,26 @@ Le altre strutture usano i tipi di base di Python. Le frontiere sono una lista d
 
 Tutte le strategie sono funzioni con la stessa firma, \texttt{strategy(global\_map, frontiers, robot\_cell, context)}, che ricevono la mappa globale, la lista delle frontiere candidate, la cella del robot e un dizionario di informazioni aggiuntive, e restituiscono la cella scelta come destinazione. La lista delle frontiere arriva alla strategia già filtrata dal ciclo di esplorazione, che ha escluso le frontiere irraggiungibili, la cella del robot e le frontiere bloccate (Sezione~\ref{sec:frontiere}), per cui la strategia si occupa soltanto della scelta.
 
-Il dizionario \texttt{context} contiene le distanze delle celle raggiungibili, la matrice dell'ordine della serpentina e il peso $w$ della scelta pesata, e ogni strategia legge soltanto le voci di cui ha bisogno. La strategia casuale non ne usa alcuna, quella basata sulle frontiere usa le distanze e quella a serpentina la matrice dell'ordine, mentre la variante con scelta pesata usa le distanze e il peso, insieme alla mappa globale su cui conta le celle bloccate. La cella del robot non è usata da nessuna delle quattro strategie, ma fa comunque parte dell'interfaccia, perché potrebbe servire a una strategia basata, per esempio, sulla distanza in linea d'aria. Le strategie diverse da quella casuale calcolano per ogni frontiera un valore, che è la distanza, il rango della macro-cella o il costo dell'Equazione~\eqref{eq:costo}, raccolgono le frontiere con il valore minimo e scelgono tra queste con la funzione \texttt{random.choice}, che risolve i casi di parità in modo casuale.
+Il dizionario \texttt{context} contiene le distanze delle celle raggiungibili, la matrice dell'ordine della serpentina e il peso $w$ della scelta pesata, e ogni strategia legge soltanto le voci di cui ha bisogno. La strategia casuale non ne usa alcuna, quella basata sulle frontiere usa le distanze e quella a serpentina la matrice dell'ordine, mentre la variante con scelta pesata usa le distanze e il peso, insieme alla mappa globale su cui conta le celle bloccate. La cella del robot non è usata da nessuna delle quattro strategie, ma fa comunque parte dell'interfaccia, perché potrebbe servire a una strategia basata, per esempio, sulla distanza in linea d'aria. Le strategie diverse da quella casuale calcolano per ogni frontiera un valore, che è la distanza, il rango della macro-cella o il costo dell'Equazione~\eqref{eq:costo}, raccolgono le frontiere con il valore minimo e scelgono tra queste con la funzione \texttt{random.choice}, che risolve i casi di parità in modo casuale. Il Listato~\ref{lst:interfaccia} riporta la chiamata della strategia all'interno del ciclo di esplorazione e, come esempio, la strategia basata sulle frontiere.
 
 Con questa interfaccia, per aggiungere una strategia è sufficiente scrivere una nuova funzione e registrarla con un nome nel dizionario delle strategie degli script di sperimentazione e di visualizzazione. Se la nuova strategia ha bisogno di un'informazione che il ciclo non fornisce ancora, questa viene aggiunta come nuova voce del dizionario \texttt{context}, senza modificare le strategie esistenti.
+
+\begin{lstlisting}[float=!htb, label=lst:interfaccia, caption={Chiamata della strategia nel ciclo di esplorazione e strategia basata sulle frontiere.}]
+# exploration.py: chiamata della strategia
+context = {"distances": distances, "rank": rank,
+           "clutter_weight": clutter_weight}
+target_cell = strategy(global_map, frontiers, robot_cell, context)
+
+# strategies.py: strategia basata sulle frontiere
+def frontier_strategy(global_map, frontiers, robot_cell, context):
+    if not frontiers:
+        return None
+    distances = context["distances"]
+    min_distance = min(distances[f] for f in frontiers)
+    nearest_frontiers = [f for f in frontiers
+                         if distances[f] == min_distance]
+    return random.choice(nearest_frontiers)
+\end{lstlisting}
 
 \section{La funzione di esplorazione}
 \label{sec:esplorazione}
