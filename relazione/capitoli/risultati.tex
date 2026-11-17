@@ -1,4 +1,105 @@
 \chapter{Risultati}
 \label{cap:risultati}
 
-% Risultati dei test
+\section{Confronto delle strategie con partenza dal centro}
+\label{sec:risultati_centro}
+
+\subsection{Copertura finale ed esplorazioni bloccate}
+\label{sec:copertura_finale}
+
+La Tabella~\ref{tab:risultati_centro} riassume i risultati delle tre strategie sui 50 boschi con partenza dal centro. Le mediane della copertura finale sono molto vicine, comprese tra il 96,1\% e il 96,3\%, mentre le medie differiscono per effetto delle esplorazioni bloccate. La strategia casuale completa tutte le esplorazioni, con una copertura finale compresa tra il 94,5\% e il 97,8\%, mentre la strategia basata sulle frontiere si blocca in 10 boschi e la serpentina in 6. I blocchi avvengono a coperture molto diverse, dal 12,9\% del seme 7, in cui il robot si ferma dopo appena 4,2~m, all'89,5\% del seme 3, e abbassano la copertura media della strategia basata sulle frontiere all'88,3\% e quella della serpentina al 91,6\%. Soltanto due boschi, generati con i semi 13 e 20, bloccano entrambe le strategie, un numero vicino a quello che ci si aspetterebbe se i blocchi delle due strategie fossero indipendenti, per cui un blocco dipende dal percorso che la strategia porta a seguire più che dal bosco in sé. Una sola esplorazione, quella della serpentina sul seme 9, si ferma tra il 90\% e il 94\%, al 91,2\%, e secondo il criterio della Sezione~\ref{sec:protocollo} non è contata come bloccata. Questo caso è discusso nella Sezione~\ref{sec:arresti_tardivi}.
+
+Le esplorazioni complete delle tre strategie raggiungono coperture finali praticamente uguali, in media il 96,2\%, perché la copertura massima dipende dal bosco, e in particolare dalle celle interne agli ostacoli, che nessuna strategia può osservare. Sui 36 boschi completati da tutte e tre le strategie la differenza tra la copertura finale più alta e quella più bassa ottenute sullo stesso bosco non supera 1,7 punti percentuali. Le strategie differiscono invece nel numero di decisioni. La strategia basata sulle frontiere ne prende in media 55, contro le 29,5 della strategia casuale e le 41,7 della serpentina, perché sceglie ogni volta una frontiera vicina e la raggiunge con pochi spostamenti. Il numero massimo osservato, 81, resta comunque lontano dal limite di 300.
+
+\begin{table}[!htb]
+    \centering
+    \small
+    \begin{tabular}{@{}lccccc@{}}
+        \toprule
+        & \multicolumn{2}{c}{Copertura finale (\%)} & & Distanza & \\
+        \cmidrule(lr){2-3}
+        Strategia & Media & Mediana & Bloccate & media (m) & Decisioni \\
+        \midrule
+        Casuale & 96,2 & 96,3 & 0 & 362,9 & 29,5 \\
+        Basata sulle frontiere & 88,3 & 96,1 & 10 & 146,7 & 55,0 \\
+        Serpentina & 91,6 & 96,2 & 6 & 190,0 & 41,7 \\
+        \bottomrule
+    \end{tabular}
+    \caption[Risultati con partenza dal centro]{Risultati delle tre strategie sui 50 boschi con partenza dal centro. La distanza media è calcolata sulle sole esplorazioni complete, mentre il numero medio di decisioni su tutte le esplorazioni.}
+    \label{tab:risultati_centro}
+\end{table}
+
+\subsection{Andamento della copertura}
+\label{sec:andamento}
+
+La Figura~\ref{fig:copertura_centro} mostra la copertura media in funzione della distanza percorsa. Tutte le curve partono dal 9,1\%, cioè dalla parte di area osservata con la prima scansione, prima di qualsiasi spostamento, che per effetto della corona corrisponde a un cerchio di 3,4~m di raggio. La strategia basata sulle frontiere è la più rapida nella prima parte dell'esplorazione. A 50~m ha una copertura media del 54,8\%, contro il 42,7\% della strategia casuale e il 41,9\% della serpentina, e raggiunge l'80\% dopo 92,4~m. La sua curva si stabilizza però all'88,3\% già intorno ai 150~m e non raggiunge mai il 90\%, perché le esplorazioni bloccate restano ferme alla copertura a cui si sono interrotte. La serpentina procede in modo simile alla strategia casuale fino a circa 100~m, coerentemente con il fatto che, partendo dal centro, deve prima raggiungere la fascia inferiore dell'area e percorrerla per intero. Successivamente la supera, raggiunge il 90\% dopo 184,2~m e si stabilizza al 91,6\%. La strategia casuale è la più lenta, raggiunge il 90\% dopo 247,0~m e il 95\% dopo 318,4~m, ma è l'unica la cui media continua a crescere fino al 96,2\%.
+
+La curva media della strategia basata sulle frontiere riunisce due gruppi di esplorazioni ben distinti. A 200~m metà delle esplorazioni ha una copertura compresa tra il 95,3\% e il 96,5\%, con una mediana del 96,1\%, uguale a quella della serpentina alla stessa distanza, mentre le esplorazioni bloccate restano ferme a valori molto più bassi. La curva va quindi letta insieme al numero di blocchi della Tabella~\ref{tab:risultati_centro}, dato che una media più bassa può derivare da pochi blocchi precoci anziché da un'esplorazione meno efficiente.
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=\textwidth]{coverage_vs_distance}
+    \caption[Copertura media con partenza dal centro]{Copertura media sui 50 boschi in funzione della distanza percorsa, con partenza dal centro. Random indica la strategia casuale e Frontier-based quella basata sulle frontiere, mentre la serpentina usa macro-celle di 4~m. Le esplorazioni terminate restano nella media con la propria copertura finale.}
+    \label{fig:copertura_centro}
+\end{figure}
+
+\subsection{Distanza percorsa nelle esplorazioni complete}
+\label{sec:distanza}
+
+Per confrontare l'efficienza delle strategie senza l'effetto dei blocchi si considerano i 36 boschi in cui tutte e tre completano l'esplorazione. Su questi la distanza media è di 146,7~m per la strategia basata sulle frontiere, di 189,2~m per la serpentina e di 357,2~m per la strategia casuale, cioè rispettivamente 1,29 e 2,43 volte quella della prima, e lo stesso ordine si ritrova in ognuno dei 36 boschi. La strategia casuale percorre la distanza maggiore perché sceglie la destinazione senza tenere conto della sua posizione, per cui attraversa più volte zone già esplorate per raggiungere frontiere lontane. La serpentina percorre circa il 29\% in più della strategia basata sulle frontiere perché segue l'ordine delle macro-celle, e rinvia quindi le frontiere vicine che appartengono a una macro-cella successiva, mentre tra le frontiere della stessa macro-cella sceglie in modo casuale e non in base alla distanza.
+
+Nel complesso le tre strategie si collocano in modo diverso rispetto all'efficienza e alla robustezza. La strategia basata sulle frontiere è la più efficiente ma anche la più esposta ai blocchi, la strategia casuale completa tutte le esplorazioni a fronte di una distanza più che doppia, e la serpentina occupa una posizione intermedia per entrambi gli aspetti.
+
+\section{Confronto con partenza dall'angolo}
+\label{sec:risultati_angolo}
+
+\subsection{Risultati}
+\label{sec:angolo_risultati}
+
+% DA SCRIVERE
+
+\subsection{Confronto tra le due partenze}
+\label{sec:angolo_confronto}
+
+% DA SCRIVERE
+
+\section{Analisi dei blocchi}
+\label{sec:blocchi}
+
+\subsection{Il meccanismo comune}
+\label{sec:meccanismo}
+
+% DA SCRIVERE
+
+\subsection{Il ruolo del bordo della mappa}
+\label{sec:bordo}
+
+% DA SCRIVERE
+
+\subsection{Arresti tardivi e celle di sicurezza sul percorso}
+\label{sec:arresti_tardivi}
+
+% DA SCRIVERE
+
+\section{La variante con scelta pesata}
+\label{sec:risultati_pesata}
+
+\subsection{Scelta del peso}
+\label{sec:taratura}
+
+% DA SCRIVERE
+
+\subsection{Confronto con la strategia basata sulle frontiere}
+\label{sec:confronto_pesata}
+
+% DA SCRIVERE
+
+\subsection{Limiti della variante}
+\label{sec:limiti_pesata}
+
+% DA SCRIVERE
+
+\section{Sintesi dei risultati}
+\label{sec:sintesi}
+
+% DA SCRIVERE

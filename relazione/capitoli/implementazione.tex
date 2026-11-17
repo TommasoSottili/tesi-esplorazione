@@ -68,6 +68,7 @@ Il ciclo di esplorazione è realizzato nel modulo \texttt{exploration.py} dalla 
         \texttt{plot\_forest\_example.py} & Figura del bosco di esempio & Fig.~\ref{fig:bosco} \\
         \texttt{plot\_lidar\_scan.py} & Figura della scansione & Fig.~\ref{fig:scansione} \\
         \texttt{plot\_first\_scan\_map.py} & Figura della mappa dopo la prima scansione & Fig.~\ref{fig:mappa} \\
+        \texttt{plot\_film\_frames.py} & Figura con due fotogrammi di un filmato & Fig.~\ref{fig:fotogrammi} \\
         \midrule
         \multicolumn{3}{@{}l}{\emph{Verifica}} \\
         \texttt{test\_*.py} & Otto script di verifica visiva dei moduli del simulatore & Sez.~\ref{sec:riproducibilita} \\
@@ -153,19 +154,259 @@ def frontier_strategy(global_map, frontiers, robot_cell, context):
 \section{La funzione di esplorazione}
 \label{sec:esplorazione}
 
-% DA SCRIVERE
+Il ciclo descritto nella Sezione~\ref{sec:ciclo} è realizzato dalla funzione \texttt{run\_exploration}, che esegue un'intera esplorazione a partire da un bosco e da una posizione iniziale e restituisce la mappa finale insieme ai dati registrati lungo il percorso.
+
+\subsection{Parametri e stato}
+\label{sec:parametri_stato}
+
+La funzione riceve l'ambiente, il sensore, la posizione iniziale e la strategia, seguiti da parametri con valori predefiniti che coincidono con quelli della Tabella~\ref{tab:parametri}, cioè le dimensioni dell'area, il lato delle celle, il lato della griglia locale, il raggio di inflazione, il numero massimo di decisioni, il lato delle macro-celle, lo spessore della corona e il peso $w$. Fa eccezione il lato delle macro-celle, il cui valore predefinito è 1~m, mentre gli script di sperimentazione e di visualizzazione passano esplicitamente 4~m. Il margine sul libero non è un parametro della funzione, perché la griglia locale viene costruita senza indicarlo e assume quindi il valore predefinito, pari al lato di una cella. Il lato delle macro-celle e il peso $w$ sono usati soltanto dalle rispettive strategie, per cui non hanno alcun effetto sulle altre.
+
+Lo stato dell'esplorazione è conservato in poche variabili locali. Oltre alla posizione del robot e alla mappa globale, inizialmente tutta sconosciuta, la funzione mantiene il percorso in corso, che vale \texttt{None} quando occorre prendere una nuova decisione, e un indicatore che segnala la necessità di eseguire una scansione, vero all'inizio e dopo ogni spostamento. Le frontiere escluse perché già raggiunte senza successo sono raccolte in un insieme, mentre una variabile a parte conserva l'ultima destinazione raggiunta, in attesa di verificare se sia rimasta una frontiera. Due contatori registrano il numero di decisioni prese, che comprende anche quelle per cui non è stato trovato un percorso, e la distanza percorsa. La matrice dell'ordine della serpentina viene calcolata una sola volta all'inizio, qualunque sia la strategia, perché il calcolo è rapido e non usa numeri casuali. La Tabella~\ref{tab:stato} associa a ciascuna di queste informazioni la variabile corrispondente nel codice.
+
+\begin{table}[!htb]
+    \centering
+    \small
+    \begin{tabular}{@{}lp{0.62\textwidth}@{}}
+        \toprule
+        Variabile & Ruolo \\
+        \midrule
+        \texttt{robot\_state} & Posizione del robot $(x, y, \theta)$, aggiornata a ogni spostamento \\
+        \texttt{global\_map} & Mappa globale, inizialmente sconosciuta e aggiornata a ogni scansione \\
+        \texttt{path} & Percorso in corso, dalla cella del robot alla destinazione, oppure \texttt{None} quando occorre una nuova decisione \\
+        \texttt{scan\_needed} & Indicatore della necessità di una scansione, vero all'inizio e dopo ogni spostamento \\
+        \texttt{stuck\_frontiers} & Insieme delle frontiere escluse, che non vengono più passate alla strategia \\
+        \texttt{pending\_check} & Ultima destinazione raggiunta, da controllare alla decisione successiva \\
+        \texttt{steps} & Numero di decisioni prese, confrontato con il limite di 300 \\
+        \texttt{total\_distance} & Distanza percorsa, che aumenta di 0,2~m a ogni spostamento \\
+        \texttt{rank} & Matrice dell'ordine delle macro-celle della serpentina, calcolata all'inizio \\
+        \bottomrule
+    \end{tabular}
+    \caption{Variabili di stato della funzione \texttt{run\_exploration}.}
+    \label{tab:stato}
+\end{table}
+
+\subsection{Struttura del ciclo}
+\label{sec:struttura_ciclo}
+
+Il ciclo è un unico \texttt{while}, che prosegue finché il numero di decisioni è inferiore al limite. Ogni iterazione comprende tre blocchi, corrispondenti alla percezione, alla decisione e al movimento, e i primi due vengono eseguiti soltanto quando servono. Il Listato~\ref{lst:ciclo} riporta una versione ridotta del ciclo, nella quale i puntini \texttt{...} sostituiscono le parti omesse.
+
+Il blocco di percezione viene eseguito quando l'indicatore di scansione è attivo. Il sensore effettua una scansione dalla posizione del robot, i punti di contatto vengono aggiunti alla nuvola di punti e i punti misurati vengono trasformati nella griglia locale, che viene poi fusa nella mappa globale. Dopo la fusione la cella del robot viene forzata nello stato libero e si applica l'inflazione, che esclude la stessa cella. Infine vengono registrati il numero di celle note, la cella del robot e una copia della mappa, e l'indicatore viene disattivato.
+
+Il blocco di decisione viene eseguito quando il percorso vale \texttt{None}. Si cercano le frontiere della mappa e, se non ce ne sono, l'esplorazione termina come completa. Altrimenti si controlla l'ultima destinazione raggiunta, che viene aggiunta alle frontiere escluse se è ancora una frontiera. Il controllo avviene in questo punto, e non all'arrivo, perché deve tenere conto della scansione eseguita dalla destinazione, che al momento dell'arrivo non è ancora stata fatta. Si calcolano poi le distanze delle celle raggiungibili con la ricerca in ampiezza e si scartano le frontiere non raggiungibili, la cella del robot e le frontiere escluse. Se non ne rimane nessuna l'esplorazione termina, e questo è il caso che nei test corrisponde a un blocco. In caso contrario si costruisce il dizionario \texttt{context}, si chiama la strategia e si pianifica il percorso verso la destinazione scelta con l'algoritmo di Dijkstra. Se il percorso non esiste, la destinazione viene aggiunta alle frontiere escluse e l'iterazione si conclude senza movimento, per cui la decisione viene ripetuta all'iterazione successiva. Poiché alla strategia arrivano soltanto frontiere già raggiungibili e i due algoritmi usano la stessa definizione di cella percorribile, questo caso non può verificarsi e il controllo resta soltanto come protezione.
+
+Il blocco di movimento considera la seconda cella del percorso, cioè la prossima da raggiungere. Se questa non è più libera, il percorso viene posto a \texttt{None} e l'iterazione si conclude senza una nuova scansione, dato che la mappa non è cambiata, per cui la nuova decisione viene presa subito con le stesse informazioni. Se invece la cella è libera, il robot viene spostato nel suo centro, la distanza aumenta del lato di una cella, l'indicatore di scansione viene attivato e la prima cella viene tolta dal percorso. Quando nel percorso resta soltanto la cella in cui si trova il robot, la destinazione è stata raggiunta, per cui viene memorizzata per il controllo descritto sopra e il percorso viene posto a \texttt{None}.
+
+I tre blocchi si susseguono in modo diverso a seconda della situazione in cui si trova il robot. Al primo giro vengono eseguiti tutti e tre, per cui il robot effettua la prima scansione, sceglie la destinazione e compie subito il primo passo. Lungo il percorso il blocco di decisione viene saltato, e ogni giro comprende una scansione dalla posizione corrente seguita dal controllo della cella successiva e dal passo, per cui il controllo usa sempre la mappa aggiornata con l'ultima scansione. Dopo l'arrivo il giro successivo esegue prima la scansione dalla destinazione e poi la decisione, e il controllo dell'ultima destinazione raggiunta trova così la mappa già aggiornata senza bisogno di istruzioni aggiuntive. Quando invece la cella successiva non è più libera, il giro si interrompe senza movimento e quello successivo salta la percezione, dato che la mappa non è cambiata, passando direttamente alla decisione. La destinazione abbandonata non viene esclusa, per cui la strategia può sceglierla di nuovo e la pianificazione trova in questo caso un percorso che aggira la cella non più libera. Il percorso in corso e l'indicatore di scansione sono quindi sufficienti a stabilire in ogni giro quali blocchi eseguire, senza altre variabili di controllo.
+
+\begin{lstlisting}[float=!htb, label=lst:ciclo, caption={Struttura del ciclo di esplorazione nella funzione \texttt{run\_exploration}, in forma ridotta.}]
+# exploration.py
+while steps < max_steps:
+    if scan_needed:                     # percezione
+        scan_points = np.array(sensor.scan(robot_state, forest))
+        ...
+        global_map.update(local, robot_state, window_size)
+        global_map.grid[robot_cell[0]][robot_cell[1]] = FREE
+        global_map.inflate_obstacles(inflation_radius, robot_cell=robot_cell)
+        scan_needed = False
+
+    if path is None:                    # decisione
+        frontiers = global_map.find_frontiers()
+        if not frontiers:
+            break                       # esplorazione completa
+        ...
+        if not frontiers:
+            break                       # nessuna frontiera raggiungibile
+        target_cell = strategy(global_map, frontiers, robot_cell, context)
+        path = find_path(global_map, robot_cell, target_cell)
+        ...
+        steps += 1
+
+    next_cell = path[1]                 # movimento
+    if global_map.grid[next_cell[0]][next_cell[1]] != FREE:
+        path = None
+        continue
+    ...
+\end{lstlisting}
+
+\subsection{Ricerca in ampiezza e algoritmo di Dijkstra}
+\label{sec:algoritmi}
+
+I due algoritmi del modulo \texttt{pathfinding.py} condividono la funzione che restituisce le celle percorribili confinanti con una cella data, cioè le quattro celle che condividono un lato con essa, purché siano interne all'area e libere. In questo modo la verifica di raggiungibilità e la pianificazione usano esattamente lo stesso grafo.
+
+La ricerca in ampiezza parte dalla cella del robot e usa una coda \texttt{deque} e un dizionario delle distanze, che contiene inizialmente la sola cella di partenza con distanza nulla. A ogni passo si estrae la cella in testa alla coda e ogni cella confinante percorribile non ancora presente nel dizionario vi viene inserita, con la distanza della cella corrente aumentata di uno, e aggiunta in fondo alla coda. Il dizionario svolge quindi sia il compito di insieme delle celle visitate sia quello di risultato, e al termine contiene tutte le celle raggiungibili con la rispettiva distanza. Il Listato~\ref{lst:ampiezza} riporta la funzione delle celle confinanti percorribili e la ricerca in ampiezza.
+
+L'algoritmo di Dijkstra mantiene una coda con priorità di coppie (distanza, cella), gestita con il modulo \texttt{heapq}, insieme a un dizionario delle distanze provvisorie, a un dizionario dei predecessori e all'insieme delle celle già estratte. A ogni passo si estrae la coppia con la distanza minore e, se la cella era già stata estratta, la coppia viene ignorata. Quando si trova una distanza minore per una cella confinante, il predecessore e la distanza vengono aggiornati e si inserisce nella coda una nuova coppia, lasciando quella vecchia, che verrà scartata alla sua estrazione, dato che \texttt{heapq} non permette di modificare la priorità di un elemento già presente. Con il costo uniforme adottato in questo lavoro questa situazione non si presenta, perché le celle vengono estratte in ordine di distanza come nella ricerca in ampiezza e la prima distanza assegnata a ogni cella è già quella minima, per cui il meccanismo diventerebbe necessario soltanto con archi di costo diverso (Sezione~\ref{sec:pianificazione}). La ricerca si interrompe quando viene estratta la destinazione, e il percorso si ricostruisce risalendo i predecessori dalla destinazione alla cella del robot e invertendo la lista ottenuta. A parità di distanza le coppie vengono ordinate in base agli indici della cella, per cui tra più percorsi di lunghezza minima viene scelto sempre lo stesso e la pianificazione non consuma numeri casuali.
+
+\begin{lstlisting}[float=!htb, label=lst:ampiezza, caption={Celle confinanti percorribili e ricerca in ampiezza.}]
+# pathfinding.py
+def get_walkable_neighbors(cell, global_map):
+    row, col = cell
+    neighbors = []
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    for dr, dc in directions:
+        r = row + dr
+        c = col + dc
+        if r < 0 or r >= global_map.n_rows or c < 0 or c >= global_map.n_cols:
+            continue
+        if global_map.grid[r][c] == FREE:
+            neighbors.append((r, c))
+    return neighbors
+
+def reachable_cells_with_distance(global_map, start):
+    if start is None:
+        return {}
+    distances = {start: 0}
+    queue = deque([start])
+    while queue:
+        current = queue.popleft()
+        for neighbor in get_walkable_neighbors(current, global_map):
+            if neighbor not in distances:
+                distances[neighbor] = distances[current] + 1
+                queue.append(neighbor)
+    return distances
+\end{lstlisting}
+
+\subsection{Valori restituiti}
+\label{sec:valori_restituiti}
+
+Al termine la funzione restituisce la mappa globale finale, la nuvola di punti, ottenuta concatenando i punti di contatto di tutte le scansioni in un'unica matrice, e un dizionario di statistiche. Il dizionario contiene il numero di decisioni, la distanza percorsa e il numero di celle note, da cui gli script ricavano la copertura dividendolo per le 10\,000 celle della mappa. Contiene inoltre quattro liste con un elemento per ogni scansione, che riportano il numero di celle note, la cella del robot, una copia della mappa e i punti di contatto della singola scansione. Le liste hanno quindi un elemento in più rispetto al numero di spostamenti, e l'elemento di indice $i$ corrisponde all'$i$-esimo fotogramma del filmato dell'esplorazione (Sezione~\ref{sec:visualizzazione}).
 
 \section{Riproducibilità e verifica}
 \label{sec:riproducibilita}
 
-% DA SCRIVERE
+\subsection{Riproducibilità delle esplorazioni}
+\label{sec:riproducibilita_esplorazioni}
+
+Ogni esplorazione è determinata dal seme del bosco, dalla strategia e dal punto di partenza. La funzione che genera il bosco inizializza con il seme il generatore di numeri casuali del modulo \texttt{random}, e da quel momento tutti i numeri casuali dell'esplorazione vengono estratti dalla stessa sequenza, prima per le posizioni e le dimensioni degli ostacoli e poi per le scelte delle strategie, che usano la funzione \texttt{random.choice} per scegliere tra le frontiere a pari merito. Le altre parti del simulatore non usano numeri casuali. Il modello del sensore prevede un rumore gaussiano, estratto con il generatore di NumPy, che in questo lavoro è disattivato, mentre la ricerca in ampiezza, l'algoritmo di Dijkstra e il calcolo dell'ordine della serpentina sono deterministici (Sezione~\ref{sec:esplorazione}). Ne risulta che due esecuzioni con gli stessi dati di partenza producono la stessa sequenza di scelte, e quindi lo stesso percorso, la stessa mappa e gli stessi risultati.
+
+Questa proprietà vale anche quando più esplorazioni vengono eseguite in parallelo. Ogni esplorazione è eseguita per intero da un solo processo e, poiché il generatore viene reinizializzato con il seme all'inizio di ogni bosco, il risultato non dipende dal processo che la esegue né dalle esplorazioni eseguite in precedenza nello stesso processo. Le scelte casuali dipendono inoltre dall'ordine degli elementi, perché la funzione \texttt{random.choice} estrae una posizione nella lista e restituisce l'elemento che vi si trova, per cui la stessa sequenza casuale applicata a una lista ordinata diversamente porterebbe a una scelta diversa. Le liste da cui scelgono le strategie hanno però sempre lo stesso ordine, dato che la lista delle frontiere viene costruita scorrendo la mappa per righe e per colonne e le liste dei candidati a pari merito vengono ricavate da essa mantenendone l'ordine. Gli insiemi e i dizionari, il cui ordine interno non è garantito nel caso degli insiemi, non vengono invece mai scorsi per costruire queste liste. L'insieme delle frontiere escluse serve soltanto a verificare se contiene una cella, il dizionario delle distanze a leggere la distanza di una cella e quello dei costi della scelta pesata a calcolarne il valore minimo, e nessuna di queste operazioni dipende dall'ordine degli elementi. Le versioni delle librerie sono fissate nel file \texttt{requirements.txt} (Sezione~\ref{sec:strumenti}), dal momento che versioni diverse di Shapely o di NumPy potrebbero calcolare le intersezioni con differenze nelle ultime cifre decimali e, per un punto che cade al limite tra due celle, cambiare lo stato di una cella e di conseguenza il percorso.
+
+\subsection{Verifica del codice}
+\label{sec:verifica}
+
+Durante lo sviluppo le singole parti del simulatore sono state verificate con otto script, i cui nomi iniziano con \texttt{test\_}, che eseguono una parte del simulatore su un bosco generato con un seme fisso e ne mostrano il risultato in una figura, accompagnata in alcuni casi dal numero di celle in ciascuno stato. La Tabella~\ref{tab:test} elenca gli script con il risultato che ciascuno mostra. Gli script non contengono controlli automatici, per cui la verifica consiste nel confronto tra la figura e il comportamento atteso. Lo script del generatore, per esempio, disegna due boschi generati con lo stesso seme, che devono risultare identici, accanto a un terzo generato con un seme diverso, mentre quello della pianificazione disegna sulla mappa il percorso calcolato tra due celle, che deve attraversare soltanto celle libere.
+
+A queste verifiche si aggiungono alcuni controlli di coerenza eseguiti sui risultati delle prove. Le esplorazioni bloccate della serie con partenza dall'angolo sono state rieseguite singolarmente e hanno riprodotto esattamente la copertura e il numero di spostamenti registrati, e allo stesso modo i filmati, generati con esecuzioni separate, riproducono le distanze e le coperture delle prove corrispondenti. La variante con scelta pesata è stata inoltre eseguita con $w = 0$, valore per cui il costo coincide con la distanza, e su otto boschi ha prodotto percorsi identici a quelli della strategia basata sulle frontiere, a conferma che la variante modifica soltanto il criterio di scelta della destinazione. Il simulatore non dispone invece di test automatici che controllino i risultati a ogni modifica del codice, e la loro introduzione è uno dei possibili sviluppi del lavoro.
+
+\begin{table}[!htb]
+    \centering
+    \small
+    \begin{tabular}{@{}lp{0.6\textwidth}@{}}
+        \toprule
+        Script & Risultato mostrato \\
+        \midrule
+        \texttt{test\_environment.py} & Bosco e prima intersezione di un segmento con gli ostacoli \\
+        \texttt{test\_forest\_generator.py} & Due boschi generati con lo stesso seme, identici, e un terzo generato con un seme diverso \\
+        \texttt{test\_lidar.py} & Punti di una scansione eseguita dal centro del bosco \\
+        \texttt{test\_local\_grid.py} & Griglia locale costruita da una scansione, accanto al bosco reale \\
+        \texttt{test\_global\_map.py} & Mappa globale dopo tre scansioni da posizioni diverse, con il numero di celle in ciascuno stato \\
+        \texttt{test\_frontiers.py} & Frontiere della mappa dopo due scansioni \\
+        \texttt{test\_pathfinding.py} & Percorso pianificato tra due celle lontane su una mappa costruita con scansioni da più posizioni \\
+        \texttt{test\_exploration.py} & Bosco reale e mappa al termine di un'esplorazione completa con la strategia a serpentina \\
+        \bottomrule
+    \end{tabular}
+    \caption{Script di verifica visiva del simulatore.}
+    \label{tab:test}
+\end{table}
 
 \section{Strumenti di sperimentazione}
 \label{sec:sperimentazione}
 
-% DA SCRIVERE
+Le prove descritte nella Sezione~\ref{sec:protocollo} sono eseguite da due script, uno per le prove sui 50 boschi e uno per la scelta del peso $w$, mentre un terzo script produce i grafici a partire dai risultati salvati. Gli script non ricevono argomenti dalla riga di comando, e la configurazione di ogni prova si imposta modificando alcune costanti all'inizio del file, come l'elenco delle strategie, il punto di partenza o il valore di $w$.
+
+\subsection{Prove sui 50 boschi}
+\label{sec:benchmark}
+
+Lo script \texttt{benchmark\_seeds.py} esegue un'esplorazione per ogni coppia di seme e strategia, con i semi da 1 a 50 e le strategie indicate nella configurazione. Ogni esplorazione è affidata a una funzione che genera il bosco, crea il sensore, chiama \texttt{run\_exploration} e misura il tempo di esecuzione, restituendo i risultati da salvare. Le esplorazioni vengono eseguite in parallelo su sei processi con la classe \texttt{ProcessPoolExecutor} del modulo \texttt{concurrent.futures}, e i risultati vengono scritti nell'ordine in cui le esplorazioni terminano, senza attendere la fine delle altre.
+
+Per ogni prova lo script produce tre file nella cartella \texttt{results}. Il primo è un file CSV con una riga per esplorazione, che riporta il seme, la strategia, la copertura finale, la distanza percorsa, il numero di decisioni, il numero di spostamenti e il tempo di esecuzione. Il secondo è un file in formato JSON Lines, con una riga per esplorazione che contiene l'intero andamento della copertura, cioè il numero di celle note dopo ogni scansione. Il terzo è un file CSV di riepilogo, scritto al termine, con il numero di esplorazioni, la copertura media e mediana, la distanza media e il tempo medio di ciascuna strategia. Ogni riga viene scritta su disco appena l'esplorazione corrispondente termina, per cui un'interruzione fa perdere soltanto le esplorazioni in corso. All'avvio lo script legge il file CSV, se esiste, ed esegue soltanto le coppie di seme e strategia che non vi compaiono ancora, così che una prova interrotta possa essere ripresa dal punto in cui si era fermata. Il Listato~\ref{lst:benchmark} riporta la parte dello script che gestisce la ripresa, l'esecuzione in parallelo e il salvataggio dei risultati. Al termine le righe vengono ordinate per seme e per strategia, dato che l'esecuzione in parallelo le scrive in un ordine che varia da una prova all'altra.
+
+Il nome dei file viene composto a partire dalla configurazione, in modo che prove diverse non si sovrascrivano. Al prefisso \texttt{benchmark} si aggiungono i nomi delle strategie quando non si tratta delle tre del confronto principale, il lato delle macro-celle quando è inclusa la serpentina, tranne che nella prima prova delle tre strategie con macro-celle di 1~m, che conserva il nome originale \texttt{benchmark\_50seeds}, il peso $w$ quando è inclusa la variante con scelta pesata e il punto di partenza quando non è il centro dell'area. La prova con partenza dall'angolo, per esempio, produce i file \texttt{benchmark\_macro4\_corner\_50seeds}. I risultati della serie con partenza dal centro usati nel Capitolo~\ref{cap:risultati} uniscono due prove, quella delle tre strategie con macro-celle di 1~m, da cui sono prese la strategia casuale e quella basata sulle frontiere, e quella della sola serpentina con macro-celle di 4~m. L'unione è corretta perché il lato delle macro-celle non ha alcun effetto sulle altre due strategie, dato che la matrice dell'ordine non viene usata e il suo calcolo non consuma numeri casuali (Sezione~\ref{sec:parametri_stato}).
+
+\begin{lstlisting}[float=!htb, label=lst:benchmark, caption={Ripresa, esecuzione in parallelo e salvataggio dei risultati nelle prove sui 50 boschi.}]
+# benchmark_seeds.py
+done = load_done_runs()
+pending = [(seed, name) for seed in SEEDS for name in STRATEGIES_TO_RUN
+           if (seed, name) not in done]
+with ProcessPoolExecutor(max_workers=N_WORKERS) as pool:
+    futures = [pool.submit(run_single, seed, name) for seed, name in pending]
+    for future in as_completed(futures):
+        row, coverage_history = future.result()
+        writer.writerow(row)
+        csv_file.flush()
+        coverage_file.write(json.dumps({
+            "seed": row["seed"], "strategy": row["strategy"],
+            "coverage_history": coverage_history}) + "\n")
+        coverage_file.flush()
+\end{lstlisting}
+
+\subsection{Scelta del peso della variante con scelta pesata}
+\label{sec:script_peso}
+
+Lo script \texttt{calibrate\_clutter\_weight.py} esegue la variante con scelta pesata sui boschi generati con i semi da 51 a 90, partendo dal centro dell'area, per ciascuno dei cinque valori di $w$ considerati. La struttura è la stessa dello script precedente, con l'esecuzione su sei processi e la ripresa delle prove interrotte, e i risultati vengono salvati in un unico file CSV con il peso, il seme, la copertura finale, la distanza percorsa e il numero di decisioni. Al termine lo script riporta per ogni peso il numero di esplorazioni bloccate con i relativi semi, la copertura media e mediana e la distanza media delle esplorazioni complete, cioè le grandezze usate per applicare il criterio di scelta descritto nella Sezione~\ref{sec:protocollo}.
+
+\subsection{Grafici dei risultati}
+\label{sec:script_grafici}
+
+Lo script \texttt{plot\_coverage.py} produce il grafico che riporta per ogni strategia la copertura media in funzione della distanza percorsa, salvato in formato PDF e PNG, per uno dei tre confronti previsti nella configurazione. I primi due riguardano le tre strategie con partenza dal centro e con partenza dall'angolo, mentre il terzo mette a confronto la strategia basata sulle frontiere e la variante con scelta pesata. In quest'ultimo caso le due strategie provengono da prove diverse, i cui file vengono letti insieme, e poiché entrambe le prove usano gli stessi 50 boschi e la partenza dal centro il confronto avviene a parità di ambiente. Poiché la copertura viene registrata dopo ogni scansione e il robot avanza di una cella tra una scansione e la successiva, l'elemento di indice $i$ dell'andamento corrisponde a una distanza di $0{,}2\,i$~m. Le esplorazioni hanno lunghezze diverse, per cui ogni andamento viene prolungato fino alla lunghezza del più lungo ripetendone l'ultimo valore, e la media a ogni distanza è così calcolata su tutte le esplorazioni, con quelle già terminate ferme alla propria copertura finale. Senza questo prolungamento la media, dopo i primi arresti, verrebbe calcolata soltanto sulle esplorazioni ancora in corso e risulterebbe più alta di quella reale. Il calcolo è riportato nel Listato~\ref{lst:media}. Lo script stampa inoltre la copertura media a distanze prefissate e la distanza alla quale la media raggiunge alcune soglie, valori usati nel Capitolo~\ref{cap:risultati}.
+
+\begin{lstlisting}[float=!htb, label=lst:media, caption={Calcolo della copertura media sulle esplorazioni di lunghezza diversa.}]
+# plot_coverage.py
+def mean_curve(runs, length):
+    padded = np.array([np.pad(r, (0, length - len(r)), mode="edge")
+                       for r in runs])
+    return padded.mean(axis=0)
+\end{lstlisting}
 
 \section{Visualizzazione}
 \label{sec:visualizzazione}
 
-% DA SCRIVERE
+\subsection{Filmati dell'esplorazione}
+\label{sec:filmati}
+
+L'andamento di una singola esplorazione può essere osservato attraverso un filmato, prodotto dallo script \texttt{frame\_generator.py}. Come gli script di sperimentazione, anche questo si configura con alcune costanti all'inizio del file, cioè il seme del bosco, la strategia, il punto di partenza e i parametri della strategia scelta. Lo script genera il bosco ed esegue l'esplorazione con \texttt{run\_exploration}, per cui il filmato non viene ricavato dai file salvati dalle prove ma da una nuova esecuzione, che grazie alla riproducibilità descritta nella Sezione~\ref{sec:riproducibilita} coincide con l'esplorazione corrispondente delle prove.
+
+Il filmato ha un fotogramma per ogni scansione e viene costruito a partire dalle liste restituite dalla funzione di esplorazione (Sezione~\ref{sec:valori_restituiti}). Ogni fotogramma è disegnato dalla funzione \texttt{render\_frame} del modulo \texttt{render.py}, che riceve la copia della mappa registrata dopo quella scansione, il percorso compiuto fino a quel momento e la nuvola di punti accumulata. La mappa è disegnata con un colore per ogni stato, grigio per le celle sconosciute, bianco per quelle libere, nero per quelle occupate e rosso per quelle di sicurezza, e sopra di essa vengono tracciati i punti di contatto, il percorso del robot e la sua posizione attuale. Ogni fotogramma viene convertito in un'immagine con la libreria Pillow e conservato in memoria, e al termine le immagini vengono composte in un unico file GIF, con un intervallo di 100~ms tra un fotogramma e il successivo, salvato nella cartella \texttt{output}. Il nome della cartella è composto a partire dalla configurazione, con la stessa logica usata per i file delle prove, e la cartella è esclusa dal controllo di versione, dato che i filmati possono essere rigenerati in qualsiasi momento. Il Listato~\ref{lst:filmato} riporta la costruzione dei fotogrammi e il salvataggio del filmato.
+
+Poiché un filmato non può essere riportato in questa relazione, la Figura~\ref{fig:fotogrammi} ne mostra due fotogrammi, tratti dall'esplorazione con la strategia a serpentina sul bosco del seme 21 con partenza dall'angolo in basso a sinistra, scelta come caso rappresentativo perché la distanza percorsa differisce di meno dell'1\% dalla mediana delle esplorazioni complete. I due fotogrammi sono prodotti dallo script \texttt{plot\_film\_frames.py} con la stessa funzione \texttt{render\_frame} usata per i filmati. Nel primo, a metà dell'esplorazione, il robot ha completato le due fasce inferiori di macro-celle e sta percorrendo la terza, mentre la parte superiore dell'area è ancora sconosciuta. Nel secondo l'esplorazione è terminata, tutti gli ostacoli sono stati osservati e restano sconosciute soltanto le celle interne agli ostacoli.
+
+\begin{lstlisting}[float=!htb, label=lst:filmato, caption={Costruzione dei fotogrammi e salvataggio del filmato.}]
+# frame_generator.py
+frames = []
+accumulated_points = np.empty((0, 2))
+for i in range(n_frames):
+    if len(point_cloud_history[i]) > 0:
+        accumulated_points = np.vstack([accumulated_points,
+                                        point_cloud_history[i]])
+    fig = render_frame(grid_history[i], trajectory[:i + 1],
+                       WORLD_WIDTH, WORLD_HEIGHT, RESOLUTION, i, n_frames,
+                       point_cloud_so_far=accumulated_points)
+    fig.canvas.draw()
+    img = Image.fromarray(np.asarray(fig.canvas.buffer_rgba())).convert('RGB')
+    frames.append(img)
+    plt.close(fig)
+frames[0].save(gif_path, save_all=True, append_images=frames[1:],
+               duration=100, loop=0)
+\end{lstlisting}
+
+\begin{figure}[!htb]
+    \centering
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{fotogramma_serpentina_meta}
+        \caption{Fotogramma 455 di 909.}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{fotogramma_serpentina_finale}
+        \caption{Fotogramma finale.}
+    \end{subfigure}
+    \caption[Fotogrammi del filmato di un'esplorazione]{Due fotogrammi del filmato dell'esplorazione con la strategia a serpentina sul bosco del seme 21, con partenza dall'angolo in basso a sinistra. I punti di contatto sono in azzurro, il percorso del robot in blu e la sua posizione in arancione.}
+    \label{fig:fotogrammi}
+\end{figure}
+
+\subsection{Figure della relazione}
+\label{sec:script_figure}
+
+Le Figure~\ref{fig:bosco}, \ref{fig:scansione} e~\ref{fig:mappa} del Capitolo~\ref{cap:metodologia} sono prodotte da tre script dedicati, che usano il bosco generato con il seme 44 e la partenza dal centro dell'area. Lo script \texttt{plot\_forest\_example.py}, che disegna il bosco di esempio, definisce anche le funzioni e le costanti comuni alle altre due figure, cioè il disegno degli ostacoli, lo stile degli assi, i colori e il salvataggio in formato PDF e PNG nella cartella delle figure della relazione, in modo che le tre figure abbiano lo stesso aspetto. Lo script \texttt{plot\_lidar\_scan.py} esegue una scansione dalla partenza e distingue i raggi che incontrano un ostacolo da quelli che raggiungono la portata massima, mentre \texttt{plot\_first\_scan\_map.py} ripete il primo passo del ciclo di esplorazione, cioè la scansione, la costruzione della griglia locale, la fusione nella mappa globale, la forzatura della cella del robot e l'inflazione, e disegna la parte di mappa attorno al robot con gli stessi parametri usati nelle prove. Le Figure~\ref{fig:ciclo} e~\ref{fig:serpentina}, che rappresentano schemi e non dati, sono invece disegnate direttamente in \LaTeX{} con il pacchetto TikZ, mentre i grafici dei risultati del Capitolo~\ref{cap:risultati} sono prodotti dallo script descritto nella Sezione~\ref{sec:script_grafici}.

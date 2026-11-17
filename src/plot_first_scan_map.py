@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import Circle, Patch, Polygon as PolygonPatch
+from shapely.geometry import Point
 from forest_generator import generate_forest
 from lidar import Lidar
 from local_grid import build_local_grid
@@ -41,10 +42,11 @@ def main():
     ax.imshow(global_map.grid, cmap=ListedColormap(STATE_COLORS), origin="lower", vmin=0, vmax=3,
               extent=[0, 20, 0, 20], interpolation="nearest")
 
-    for obstacle in forest.obstacles:
+    hits = scan_points[np.hypot(scan_points[:, 0] - START[0], scan_points[:, 1] - START[1]) < R_MAX - 1e-6]
+    hit_obstacles = [o for o in forest.obstacles if any(o.distance(Point(p)) < 1e-6 for p in hits)]
+    for obstacle in hit_obstacles:
         ax.add_patch(PolygonPatch(list(obstacle.exterior.coords), closed=True, fill=False,
                                   edgecolor="#2a78d6", linewidth=0.9))
-    # portata del sensore: l'anello sconosciuto tra il disco libero e questo cerchio e' la corona
     ax.add_patch(Circle(START, R_MAX, fill=False, edgecolor=INK_PRIMARY, linewidth=0.9, linestyle="--"))
     ax.plot(*START, marker="o", markersize=6, color="#2a78d6", markeredgecolor="white", zorder=3)
 

@@ -16,14 +16,12 @@
     \node[dec, below=of front] (reach) {Frontiere\\raggiungibili?};
     \node[box, below=of reach] (choose) {Scelta della destinazione\\(strategia di esplorazione)};
     \node[box, below=of choose] (plan) {Calcolo del percorso (Dijkstra)};
-    \node[dec, below=of plan] (found) {Percorso\\trovato?};
-    \node[dec, below=of found] (next) {Cella successiva\\libera?};
+    \node[dec, below=of plan] (next) {Cella successiva\\libera?};
     \node[box, below=of next] (move) {Spostamento di una cella};
 
     % esiti laterali
     \node[term] (done) at ($(front)+(58mm,0)$) {Esplorazione\\completa};
     \node[term] (block) at ($(reach)+(58mm,0)$) {Arresto\\(blocco)};
-    \node[side] (excl) at ($(found)+(58mm,0)$) {Esclusione della\\destinazione};
     \node[side] (drop) at ($(next)+(58mm,0)$) {Abbandono\\del percorso};
 
     % linee verticali dei ritorni
@@ -39,21 +37,18 @@
     \draw[arr] (front) -- node[lab, right] {sì} (reach);
     \draw[arr] (reach) -- node[lab, right] {sì} (choose);
     \draw[arr] (choose) -- (plan);
-    \draw[arr] (plan) -- (found);
-    \draw[arr] (found) -- node[lab, right] {sì} (next);
+    \draw[arr] (plan) -- (next);
     \draw[arr] (next) -- node[lab, right] {sì} (move);
 
     % uscite laterali
     \draw[arr] (front) -- node[lab, above] {no} (done);
     \draw[arr] (reach) -- node[lab, above] {no} (block);
-    \draw[arr] (found) -- node[lab, above] {no} (excl);
     \draw[arr] (next) -- node[lab, above] {no} (drop);
 
     % percorso gia' disponibile: si passa direttamente al controllo della cella successiva
     \draw[arr] (path.west) -- node[lab, above, pos=0.25] {sì} (path.west -| L1) |- (next.west);
     % dopo lo spostamento si esegue una nuova scansione
     \draw[arr] (move.west) -- (move.west -| L2) |- (scan.west);
-    % dopo un'esclusione o un abbandono si torna alla scelta della destinazione
-    \draw (excl.east) -- (excl.east -| R);
+    % dopo l'abbandono del percorso si torna alla scelta della destinazione
     \draw[arr] (drop.east) -- (drop.east -| R) |- (J);
 \end{tikzpicture}

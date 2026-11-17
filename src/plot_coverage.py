@@ -8,18 +8,20 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 
-START = "corner"   # "center" | "corner": punto di partenza del test da rappresentare
+DATASET = "frontier_weighted"   # "center" | "corner" | "frontier_weighted": confronto da rappresentare
 
-# per ogni partenza: file dei dati e suffisso dei grafici (il test dal centro mantiene i nomi originali)
 DATASETS = {
-    "center": ("final_50seeds", ""),
-    "corner": ("benchmark_macro4_corner_50seeds", "_corner"),
+    "center": ({"random": "final_50seeds", "frontier": "final_50seeds", "serpentine": "final_50seeds"}, ""),
+    "corner": ({"random": "benchmark_macro4_corner_50seeds", "frontier": "benchmark_macro4_corner_50seeds",
+                "serpentine": "benchmark_macro4_corner_50seeds"}, "_corner"),
+    "frontier_weighted": ({"frontier": "final_50seeds",
+                           "frontier_weighted": "benchmark_frontier_weighted_w2_50seeds"}, "_frontier_weighted"),
 }
-DATA_NAME, OUTPUT_SUFFIX = DATASETS[START]
+SOURCES, OUTPUT_SUFFIX = DATASETS[DATASET]
+SINGLE_SOURCE = len(set(SOURCES.values())) == 1
 
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
-COVERAGE_PATH = os.path.join(RESULTS_DIR, f"{DATA_NAME}_coverage.jsonl")
-RUNS_PATH = os.path.join(RESULTS_DIR, f"{DATA_NAME}.csv")
+RUNS_PATH = os.path.join(RESULTS_DIR, f"{next(iter(SOURCES.values()))}.csv")
 OUTPUT_BASE = os.path.join(RESULTS_DIR, f"coverage_vs_distance{OUTPUT_SUFFIX}")
 FINAL_OUTPUT_BASE = os.path.join(RESULTS_DIR, f"final_coverage_per_run{OUTPUT_SUFFIX}")
 
@@ -28,11 +30,13 @@ BLOCKED_THRESHOLD = 90.0
 RESOLUTION = 0.2
 TOTAL_CELLS = int(20.0 / RESOLUTION) * int(20.0 / RESOLUTION)
 
-SERIES = {
-    "random":     {"label": "Random",                       "color": "#2a78d6"},
-    "frontier":   {"label": "Frontier-based",               "color": "#eb6834"},
-    "serpentine": {"label": "Serpentina", "color": "#1baf7a"},
+STYLES = {
+    "random":            {"label": "Random",                  "color": "#2a78d6"},
+    "frontier":          {"label": "Frontier-based",          "color": "#eb6834"},
+    "serpentine":        {"label": "Serpentina",              "color": "#1baf7a"},
+    "frontier_weighted": {"label": "Frontier-based pesata",   "color": "#6250d6"},
 }
+SERIES = {name: STYLES[name] for name in SOURCES}
 
 INK_PRIMARY = "#0b0b0b"
 INK_SECONDARY = "#52514e"
@@ -42,10 +46,12 @@ AXIS = "#c3c2b7"
 
 def load_curves():
     curves = {name: [] for name in SERIES}
-    with open(COVERAGE_PATH) as f:
-        for line in f:
-            run = json.loads(line)
-            curves[run["strategy"]].append(np.array(run["coverage_history"]) / TOTAL_CELLS * 100)
+    for data_name in sorted(set(SOURCES.values())):
+        with open(os.path.join(RESULTS_DIR, f"{data_name}_coverage.jsonl")) as f:
+            for line in f:
+                run = json.loads(line)
+                if SOURCES.get(run["strategy"]) == data_name:
+                    curves[run["strategy"]].append(np.array(run["coverage_history"]) / TOTAL_CELLS * 100)
     return curves
 
 
@@ -60,15 +66,11 @@ def style_axes(ax, grid_axis):
 
 
 def mean_curve(runs, length):
-    # un run che si e' fermato (completato o bloccato) resta alla sua copertura finale,
-    # cosi' la media a ogni distanza e' sempre calcolata su tutti i run
     padded = np.array([np.pad(r, (0, length - len(r)), mode="edge") for r in runs])
     return padded.mean(axis=0)
 
 
 def spread_labels(values, min_gap):
-    # etichette con valori troppo vicini si sovrappongono: le distanzio di almeno min_gap,
-    # spostando il gruppo in modo che resti centrato sui valori reali
     order = sorted(values, key=values.get, reverse=True)
     positions = {}
     for i, name in enumerate(order):
@@ -102,7 +104,6 @@ def main():
     ax.set_xlabel("Distanza percorsa (m)", color=INK_PRIMARY)
     ax.set_ylabel("Copertura (%)", color=INK_PRIMARY)
     style_axes(ax, "y")
-    # tacche senza numero a meta' tra i valori etichettati (50, 150, ...)
     ax.xaxis.set_major_locator(MultipleLocator(100))
     ax.xaxis.set_minor_locator(MultipleLocator(50))
     ax.tick_params(axis="x", which="minor", length=3.5, color=INK_SECONDARY)
@@ -120,25 +121,28 @@ def main():
     print("\nCopertura media a varie distanze:")
     for d in (25, 50, 100, 150, 200, 300, 400):
         i = int(round(d / RESOLUTION))
+        if i >= length:
+            break
         print(f"  {d:3d} m | " + " | ".join(f"{name} {means[name][i]:5.1f}%" for name in SERIES))
     print("\nDistanza alla quale la copertura media raggiunge:")
-    for target in (50, 80, 85, 90):
+    for target in (50, 80, 85, 90, 95):
         reached = []
         for name in SERIES:
             idx = np.argmax(means[name] >= target) if means[name].max() >= target else None
             reached.append(f"{name} " + (f"{idx * RESOLUTION:5.1f} m" if idx is not None else "  mai"))
         print(f"  {target}% | " + " | ".join(reached))
 
-    plot_final_coverage()
+    if SINGLE_SOURCE:
+        plot_final_coverage()
 
 
 def plot_final_coverage():
     with open(RUNS_PATH, newline="") as f:
         rows = list(csv.DictReader(f))
 
-    names = list(SERIES)[::-1]   # dal basso verso l'alto, cosi' Random compare in cima
+    names = list(SERIES)[::-1]   
     fig, ax = plt.subplots(figsize=(7.5, 3.4))
-    rng = np.random.default_rng(0)   # spostamento verticale fisso, per separare i punti sovrapposti
+    rng = np.random.default_rng(0)   
 
     print("\nRun bloccati (copertura finale sotto il 90%):")
     for y, name in enumerate(names):

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Polygon as PolygonPatch
 from forest_generator import generate_forest
 
-SEED = 1
+SEED = 44
 START = (10.0, 10.0)
 CLEARANCE = 1.5
 

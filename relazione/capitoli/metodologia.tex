@@ -17,7 +17,7 @@ Il robot, a sua volta, è modellato come un punto materiale descritto dalla sola
 \begin{figure}[!htb]
     \centering
     \includegraphics[width=0.6\textwidth]{bosco_esempio}
-    \caption[Esempio di bosco generato]{Esempio di bosco generato (seed 1): 15 alberi, rappresentati da cerchi, e 3 rocce, rappresentate da esagoni irregolari, in un'area di 20 $\times$ 20~m. Il punto nero è la posizione di partenza del robot al centro dell'area; il cerchio tratteggiato delimita la zona di raggio 1,5~m in cui non vengono collocati ostacoli.}
+    \caption[Esempio di bosco generato]{Esempio di bosco generato (seed 44): 15 alberi, rappresentati da cerchi, e 3 rocce, rappresentate da esagoni irregolari, in un'area di 20 $\times$ 20~m. Il punto nero è la posizione di partenza del robot al centro dell'area; il cerchio tratteggiato delimita la zona di raggio 1,5~m in cui non vengono collocati ostacoli.}
     \label{fig:bosco}
 \end{figure}
 
@@ -35,7 +35,7 @@ Ne risulta che una scansione contiene due tipi di raggi, che forniscono informaz
 \begin{figure}[!htb]
     \centering
     \includegraphics[width=0.6\textwidth]{scansione_lidar}
-    \caption[Scansione LiDAR dal punto di partenza]{Scansione LiDAR dal punto di partenza nel bosco della Figura~\ref{fig:bosco}. In blu i raggi che colpiscono un ostacolo, con il punto di impatto; in grigio chiaro i raggi che raggiungono la portata massima di 4~m senza incontrare ostacoli. Le due rocce vicine al robot nascondono le zone alle loro spalle.}
+    \caption[Scansione LiDAR dal punto di partenza]{Scansione LiDAR dal punto di partenza nel bosco della Figura~\ref{fig:bosco}. In blu i raggi che colpiscono un ostacolo, con il punto di impatto; in grigio chiaro i raggi che raggiungono la portata massima di 4~m senza incontrare ostacoli. La roccia e l'albero vicini al robot nascondono le zone alle loro spalle.}
     \label{fig:scansione}
 \end{figure}
 
@@ -77,7 +77,7 @@ La Figura~\ref{fig:mappa} mostra la mappa ottenuta dalla prima scansione eseguit
 \begin{figure}[!htb]
     \centering
     \includegraphics[width=0.6\textwidth]{mappa_prima_scansione}
-    \caption[Mappa dopo la prima scansione]{Mappa dopo la prima scansione dal punto di partenza, ingrandita attorno al robot, per il bosco della Figura~\ref{fig:bosco}. Le celle libere formano un disco di raggio 3,4~m, e l'anello sconosciuto che lo separa dal cerchio tratteggiato, corrispondente alla portata di 4~m, è la corona. Le celle occupate si trovano sul contorno delle due rocce, il cui profilo reale è tracciato in blu insieme alla posizione del robot, e sono affiancate dalle celle di sicurezza; le zone alle spalle delle rocce restano sconosciute.}
+    \caption[Mappa dopo la prima scansione]{Mappa dopo la prima scansione dal punto di partenza, ingrandita attorno al robot, per il bosco della Figura~\ref{fig:bosco}. Le celle libere formano un disco di raggio 3,4~m, e l'anello sconosciuto che lo separa dal cerchio tratteggiato, corrispondente alla portata di 4~m, è la corona. Le celle occupate si trovano sul contorno della roccia e dell'albero colpiti dalla scansione, il cui profilo reale è tracciato in blu insieme alla posizione del robot, e sono affiancate dalle celle di sicurezza, mentre le zone alle spalle dei due ostacoli restano sconosciute.}
     \label{fig:mappa}
 \end{figure}
 
@@ -88,14 +88,14 @@ Seguendo la definizione di Yamauchi~\cite{yamauchi1997}, una frontiera è una ce
 
 Una frontiera può essere utile come destinazione solo se il robot è in grado di raggiungerla. Prima di ogni scelta della destinazione si determinano quindi le celle raggiungibili dalla posizione del robot, esplorando la mappa a partire dalla sua cella e passando da una cella libera a un'altra confinante, sempre attraverso un lato di essa. In questo modo si ottiene, per ogni cella raggiungibile, anche la sua distanza dal robot, misurata come numero minimo di passi tra celle libere. Questa distanza tiene conto degli ostacoli e delle zone non ancora osservate, per cui può essere molto maggiore della distanza in linea d'aria, ed è la misura usata dalle strategie che scelgono la destinazione in base alla vicinanza (Sezione~\ref{sec:strategie}).
 
-Alle strategie viene passato solo l'insieme delle frontiere raggiungibili, da cui sono escluse due categorie di celle. La prima è la cella in cui si trova il robot, che può risultare una frontiera poiché viene forzata nello stato libero (Sezione~\ref{sec:inflazione}) e che non avrebbe senso scegliere come destinazione. La seconda comprende le frontiere che il robot ha già raggiunto senza che smettessero di essere tali, per esempio perché una cella sconosciuta adiacente si trova all'interno di un ostacolo o in una zona che nessun raggio riesce a raggiungere. Senza questa esclusione il robot potrebbe sceglierle di nuovo indefinitamente. Alla stessa categoria vengono aggiunte le frontiere verso cui non è stato possibile pianificare un percorso. Quando non esiste alcuna frontiera l'esplorazione è completa, mentre quando esistono frontiere ma nessuna è raggiungibile il robot si ferma. Il significato di questa seconda condizione è discusso nella Sezione~\ref{sec:ciclo}.
+Alle strategie viene passato solo l'insieme delle frontiere raggiungibili, da cui sono escluse due categorie di celle. La prima è la cella in cui si trova il robot, che può risultare una frontiera poiché viene forzata nello stato libero (Sezione~\ref{sec:inflazione}) e che non avrebbe senso scegliere come destinazione. La seconda comprende le frontiere che il robot ha già raggiunto senza che smettessero di essere tali, per esempio perché una cella sconosciuta adiacente si trova all'interno di un ostacolo o in una zona che nessun raggio riesce a raggiungere. Senza questa esclusione il robot potrebbe sceglierle di nuovo indefinitamente. Quando non esiste alcuna frontiera l'esplorazione è completa, mentre quando esistono frontiere ma nessuna è raggiungibile il robot si ferma. Il significato di questa seconda condizione è discusso nella Sezione~\ref{sec:ciclo}.
 
 \section{Pianificazione del percorso}
 \label{sec:pianificazione}
 
 Una volta scelta la destinazione, il percorso per raggiungerla viene calcolato con l'algoritmo di Dijkstra~\cite{dijkstra1959}, applicato a un grafo i cui nodi sono le celle libere della mappa e gli archi collegano le celle libere che condividono un lato. Ogni arco ha lo stesso costo, pari allo spostamento di una cella, per cui il percorso restituito è una sequenza di celle libere adiacenti che collega la cella del robot alla destinazione con il minor numero possibile di passi. Il robot si muove quindi solo nelle quattro direzioni parallele ai lati della griglia, e ogni passo corrisponde a uno spostamento di 0,2~m.
 
-Poiché il grafo contiene soltanto celle libere, il percorso non attraversa mai celle sconosciute, occupate o di sicurezza. La pianificazione si basa esclusivamente sulla parte di ambiente già osservata e riconosciuta come percorribile. Se la destinazione non è collegata alla cella del robot da celle libere, l'algoritmo non trova alcun percorso valido e la destinazione viene esclusa dalle scelte successive, come descritto nella Sezione~\ref{sec:frontiere}.
+Poiché il grafo contiene soltanto celle libere, il percorso non attraversa mai celle sconosciute, occupate o di sicurezza. La pianificazione si basa esclusivamente sulla parte di ambiente già osservata e riconosciuta come percorribile. Un percorso verso la destinazione esiste sempre, dato che questa viene scelta tra le frontiere raggiungibili e la verifica di raggiungibilità (Sezione~\ref{sec:frontiere}) si muove sulle stesse celle libere e con gli stessi spostamenti usati dalla pianificazione.
 
 Con costi tutti uguali l'algoritmo di Dijkstra visita le celle nello stesso ordine di una ricerca in ampiezza e fornisce lo stesso risultato, per cui la lunghezza del percorso pianificato coincide esattamente con la distanza calcolata nella verifica di raggiungibilità. La formulazione con costi permetterebbe di assegnare agli archi pesi diversi, per esempio per penalizzare il passaggio vicino agli ostacoli, possibilità che in questo lavoro non è stata adottata. Tra i percorsi di lunghezza minima, infatti, nulla favorisce quelli lontani dagli ostacoli, e il percorso pianificato passa spesso a ridosso delle celle di sicurezza, dove la scoperta tardiva descritta nella Sezione~\ref{sec:margini} ha più probabilità di manifestarsi.
 
