@@ -8,15 +8,17 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 
-DATASET = "frontier_weighted"   # "center" | "corner" | "frontier_weighted": confronto da rappresentare
+DATASET = "frontier_weighted_complete"   # "center" | "corner" | "frontier_weighted" | "frontier_weighted_complete"
 
+FRONTIER_SOURCES = {"frontier": "final_50seeds", "frontier_weighted": "benchmark_frontier_weighted_w2_50seeds"}
 DATASETS = {
     "center": ({"random": "final_50seeds", "frontier": "final_50seeds", "serpentine": "final_50seeds"}, ""),
     "corner": ({"random": "benchmark_macro4_corner_50seeds", "frontier": "benchmark_macro4_corner_50seeds",
                 "serpentine": "benchmark_macro4_corner_50seeds"}, "_corner"),
-    "frontier_weighted": ({"frontier": "final_50seeds",
-                           "frontier_weighted": "benchmark_frontier_weighted_w2_50seeds"}, "_frontier_weighted"),
+    "frontier_weighted": (FRONTIER_SOURCES, "_frontier_weighted"),
+    "frontier_weighted_complete": (FRONTIER_SOURCES, "_frontier_weighted_complete"),
 }
+COMPLETE_ONLY = DATASET == "frontier_weighted_complete"
 SOURCES, OUTPUT_SUFFIX = DATASETS[DATASET]
 SINGLE_SOURCE = len(set(SOURCES.values())) == 1
 
@@ -44,14 +46,27 @@ GRID = "#e1e0d9"
 AXIS = "#c3c2b7"
 
 
+def complete_seeds():
+    seeds = None
+    for name, data_name in SOURCES.items():
+        with open(os.path.join(RESULTS_DIR, f"{data_name}.csv"), newline="") as f:
+            done = {int(r["seed"]) for r in csv.DictReader(f)
+                    if r["strategy"] == name and float(r["coverage_pct"]) >= BLOCKED_THRESHOLD}
+        seeds = done if seeds is None else seeds & done
+    return seeds
+
+
 def load_curves():
     curves = {name: [] for name in SERIES}
+    selected = complete_seeds() if COMPLETE_ONLY else None
     for data_name in sorted(set(SOURCES.values())):
         with open(os.path.join(RESULTS_DIR, f"{data_name}_coverage.jsonl")) as f:
             for line in f:
                 run = json.loads(line)
-                if SOURCES.get(run["strategy"]) == data_name:
+                if SOURCES.get(run["strategy"]) == data_name and (selected is None or run["seed"] in selected):
                     curves[run["strategy"]].append(np.array(run["coverage_history"]) / TOTAL_CELLS * 100)
+    if selected is not None:
+        print(f"Boschi completati da tutte le strategie del confronto: {len(selected)}")
     return curves
 
 
@@ -99,6 +114,18 @@ def main():
                     xytext=(6, 0), textcoords="offset points", va="center",
                     fontsize=9, color=INK_SECONDARY, annotation_clip=False)
 
+    if COMPLETE_ONLY:
+        end_distance = {name: np.mean([(len(r) - 1) * RESOLUTION for r in curves[name]]) for name in SERIES}
+        ordered = sorted(SERIES, key=end_distance.get)
+        for k, name in enumerate(ordered):
+            d = end_distance[name]
+            ax.axvline(d, color=SERIES[name]["color"], linestyle=":", linewidth=1.2, zorder=1)
+            ax.text(d + (1.5 if k == len(ordered) - 1 else -1.5), 50, f"fine {d:.1f} m",
+                    ha="left" if k == len(ordered) - 1 else "right", va="center",
+                    fontsize=8, color=INK_SECONDARY)
+        print("\nDistanza media di fine esplorazione:",
+              " | ".join(f"{name} {end_distance[name]:.1f} m" for name in SERIES))
+
     ax.set_xlim(0, distance[-1])
     ax.set_ylim(0, 100)
     ax.set_xlabel("Distanza percorsa (m)", color=INK_PRIMARY)
@@ -108,7 +135,7 @@ def main():
     ax.xaxis.set_minor_locator(MultipleLocator(50))
     ax.tick_params(axis="x", which="minor", length=3.5, color=INK_SECONDARY)
 
-    legend = ax.legend(loc="lower right", frameon=False, fontsize=9)
+    legend = ax.legend(loc="lower center" if COMPLETE_ONLY else "lower right", frameon=False, fontsize=9)
     for text in legend.get_texts():
         text.set_color(INK_PRIMARY)
 

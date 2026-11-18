@@ -118,12 +118,39 @@ for _ in range(n_trees):
 
 La mappa globale è un oggetto della classe \texttt{GlobalMap}, che conserva le dimensioni dell'area, il lato delle celle e la matrice degli stati, cioè una matrice NumPy di numeri interi di 100 righe e 100 colonne, inizializzata con il valore dello stato sconosciuto. Gli stati sono codificati dalle costanti \texttt{UNKNOWN}, \texttt{FREE}, \texttt{OCCUPIED} e \texttt{INFLATED}, con i valori da 0 a 3, definite nello stesso modulo e importate dagli altri. Una cella è individuata dalla coppia (riga, colonna), in cui la riga corrisponde alla coordinata $y$ e la colonna alla coordinata $x$, e la cella $(0, 0)$ è quella nell'angolo in basso a sinistra dell'area. La conversione da un punto $(x, y)$ alla cella che lo contiene divide ciascuna coordinata per il lato della cella e ne prende la parte intera, dopo aver aggiunto una tolleranza di $10^{-9}$ che impedisce a un punto che si trova esattamente sul lato tra due celle di essere assegnato alla cella precedente per un errore di arrotondamento. Un punto esterno all'area non ha una cella corrispondente, e in questo caso la funzione restituisce il valore \texttt{None}, che il codice chiamante gestisce scartando il punto. La conversione inversa associa a una cella il suo centro, e dopo ogni spostamento il robot viene posto nel centro della nuova cella.
 
-La griglia locale è una matrice dello stesso tipo, di 40 $\times$ 40 celle, che copre il quadrato di 8~m di lato centrato sul robot e usa gli stessi codici per gli stati sconosciuto, libero e occupato, mentre lo stato di sicurezza esiste soltanto nella mappa globale. Nella fusione la cella della griglia locale di indici $(i, j)$ viene associata alla cella della mappa globale $(r - 20 + i,\, c - 20 + j)$, dove $(r, c)$ è la cella del robot, e le celle che cadono fuori dall'area vengono scartate.
+La griglia locale è una matrice dello stesso tipo, di 40 $\times$ 40 celle, che copre il quadrato di 8~m di lato centrato sul robot e usa gli stessi codici per gli stati sconosciuto, libero e occupato, mentre lo stato di sicurezza esiste soltanto nella mappa globale. Nella fusione la cella della griglia locale di indici $(i, j)$ viene associata alla cella della mappa globale $(r - 20 + i,\, c - 20 + j)$, dove $(r, c)$ è la cella del robot, e le celle che cadono fuori dall'area vengono scartate. Il Listato~\ref{lst:fusione} riporta il metodo che esegue la fusione, nel quale si riconoscono questa corrispondenza e le regole della Sezione~\ref{sec:aggiornamento}.
 % NOTA (verifica in corso): con il robot al centro di una cella la griglia locale
 % risulta sfasata di mezza cella rispetto a questa corrispondenza. Da decidere
 % con l'autore prima di rileggere questo paragrafo.
 
 Le altre strutture usano i tipi di base di Python. Le frontiere sono una lista di coppie (riga, colonna), le distanze calcolate con la ricerca in ampiezza sono un dizionario che associa a ogni cella raggiungibile il numero di passi necessari per raggiungerla, e un percorso è la lista delle celle da attraversare, dalla cella del robot alla destinazione comprese. A ogni spostamento la prima cella viene tolta dalla lista, per cui la seconda è sempre la prossima cella da controllare. L'ordine della serpentina è una matrice delle stesse dimensioni della mappa, che contiene per ogni cella il rango della macro-cella a cui appartiene e viene calcolata una sola volta all'inizio dell'esplorazione. Anche il conteggio delle celle bloccate usato dalla scelta pesata è una matrice di questo tipo, che viene però ricalcolata a ogni decisione perché dipende dallo stato della mappa. Per ottenerla si costruisce la matrice booleana delle celle occupate o di sicurezza, la si estende con due file di celle bloccate su ogni lato, in modo che le celle esterne all'area vengano contate come bloccate, e si sommano i valori di ogni finestra di 5 $\times$ 5 celle con la funzione \texttt{sliding\_window\_view} di NumPy.
+
+\begin{lstlisting}[float=!htb, label=lst:fusione, caption={Fusione della griglia locale nella mappa globale.}]
+# global_map.py
+def update(self, local_grid, robot_state, window_size=4.0):
+    robot_x, robot_y, _ = robot_state
+    n_local = local_grid.shape[0]
+    robot_cell = self.world_to_cell(robot_x, robot_y)
+    if robot_cell is None:
+        return
+    robot_row, robot_col = robot_cell
+    half_cells = n_local // 2
+    for local_row in range(n_local):
+        for local_col in range(n_local):
+            state = local_grid[local_row][local_col]
+            if state == UNKNOWN:
+                continue
+            global_row = robot_row - half_cells + local_row
+            global_col = robot_col - half_cells + local_col
+            if (global_row < 0 or global_row >= self.n_rows
+                    or global_col < 0 or global_col >= self.n_cols):
+                continue
+            current = self.grid[global_row][global_col]
+            if current == UNKNOWN:
+                self.grid[global_row][global_col] = state
+            elif state == OCCUPIED:
+                self.grid[global_row][global_col] = OCCUPIED
+\end{lstlisting}
 
 \subsection{Interfaccia delle strategie}
 \label{sec:interfaccia}
